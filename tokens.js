@@ -1,563 +1,602 @@
-:root {
-  --bg: #050609;
-  --bg-card: #101219;
-  --bg-card-soft: #141726;
-  --accent: #00a8ff;
-  --accent-soft: rgba(0, 168, 255, 0.15);
-  --border-subtle: #202335;
-  --text-main: #ffffff;
-  --text-muted: #9ba0b8;
-  --danger: #ff4b5c;
-  --warning: #ffc857;
-  --safe: #22c55e;
-  --unknown: #4b5563;
-  --mono: "SF Mono", "Consolas", "Menlo", "Roboto Mono", monospace;
+// Network configuration (future-proof for mainnet)
+const NETWORKS = {
+  arcTestnet: {
+    label: "ARC Testnet",
+    explorerBase: "https://testnet.arcscan.app"
+  },
+  arcMainnet: {
+    label: "ARC Mainnet",
+    explorerBase: "https://arcscan.app"
+  }
+};
+
+// Known trusted tokens on ARC
+const TRUSTED_TOKENS = {
+  "0x3600000000000000000000000000000000000000": {
+    label: "USDC",
+    note: "Official USDC on ARC Testnet",
+    refSupply: "1000000000000000"
+  }
+};
+
+// Chart instances
+let riskPieChart = null;
+let riskBarChart = null;
+let riskLineChart = null;
+let supplyBarChart = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("analyzeBtn");
+  const themeToggle = document.getElementById("themeToggle");
+  const copyBtn = document.getElementById("copyAddressBtn");
+
+  btn.addEventListener("click", handleAnalyze);
+  document
+    .getElementById("tokenAddress")
+    .addEventListener("keyup", (e) => {
+      if (e.key === "Enter") handleAnalyze();
+    });
+
+  initThemeToggle(themeToggle);
+  initCopyButton(copyBtn);
+});
+
+function initThemeToggle(button) {
+  const body = document.body;
+  const saved = localStorage.getItem("arc-theme");
+  if (saved === "light" || saved === "dark") {
+    body.setAttribute("data-theme", saved);
+  }
+  updateThemeIcon(button);
+
+  button.addEventListener("click", () => {
+    const current = body.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+    body.setAttribute("data-theme", next);
+    localStorage.setItem("arc-theme", next);
+    updateThemeIcon(button);
+  });
 }
 
-/* Light mode futurista – override quando body[data-theme="light"] */
-
-body[data-theme="light"] {
-  --bg: #f2f6ff;
-  --bg-card: #ffffff;
-  --bg-card-soft: #e5edff;
-  --accent: #0066ff;
-  --accent-soft: rgba(0, 102, 255, 0.1);
-  --border-subtle: #d1d5e5;
-  --text-main: #0b1120;
-  --text-muted: #6b7280;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --safe: #15803d;
-  --unknown: #4b5563;
+function updateThemeIcon(button) {
+  const body = document.body;
+  const current = body.getAttribute("data-theme") || "dark";
+  button.textContent = current === "dark" ? "🌙" : "☀️";
 }
 
-* {
-  box-sizing: border-box;
+function initCopyButton(copyBtn) {
+  copyBtn.addEventListener("click", async () => {
+    const addrShort = document.getElementById("tokenAddressShort").dataset.full;
+    if (!addrShort) return;
+    try {
+      await navigator.clipboard.writeText(addrShort);
+      copyBtn.classList.add("copied");
+      copyBtn.textContent = "✔ Copied";
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        copyBtn.textContent = "📋 Copy";
+      }, 1200);
+    } catch (e) {
+      console.error("Clipboard error", e);
+    }
+  });
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text-main);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  transition: background 0.2s ease, color 0.2s ease;
-}
+async function handleAnalyze() {
+  const input = document.getElementById("tokenAddress");
+  const address = (input.value || "").trim();
 
-/* Shell */
+  if (!address || !address.startsWith("0x") || address.length < 10) {
+    alert("Please enter a valid token contract address (0x...).");
+    return;
+  }
 
-.app-shell {
-  max-width: 960px;
-  margin: 40px auto 30px;
-  padding: 0 16px;
-}
+  const networkKey = document.getElementById("networkSelect").value;
+  const tokenCard = document.getElementById("tokenCard");
+  const riskCard = document.getElementById("riskCard");
+  const chartsSection = document.getElementById("chartsSection");
+  const statusMsg = document.getElementById("statusMsg");
 
-.app-header {
-  margin-bottom: 24px;
-}
+  tokenCard.classList.add("hidden");
+  riskCard.classList.add("hidden");
+  chartsSection.classList.add("hidden");
+  statusMsg.textContent = "Loading token data from ARC public API...";
 
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
+  try {
+    // network param futuro: backend pode usar para trocar de endpoint
+    const resp = await fetch(
+      `/api/arc-token?address=${address}&network=${networkKey}`
+    );
+    const data = await resp.json();
 
-.app-header h1 {
-  margin: 0;
-  font-size: 32px;
-  letter-spacing: 0.06em;
-}
+    if (!resp.ok || !data || !data.name) {
+      statusMsg.textContent = "Token not found or API returned an error.";
+      return;
+    }
 
-.subtitle {
-  margin: 8px 0 0;
-  color: var(--text-muted);
-  font-size: 14px;
-}
+    fillTokenInfo(address, data, networkKey);
 
-/* Top right controls */
+    const riskResult = applyRiskSignal(address, data); // level + score + breakdown
+    updateChartsAndBreakdown(address, data, riskResult);
 
-.top-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.network-select-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.network-select-wrapper select {
-  padding: 5px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-  color: var(--text-main);
-  font-size: 12px;
-}
-
-.theme-toggle {
-  border: none;
-  border-radius: 999px;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: var(--bg-card-soft);
-  color: var(--text-main);
-  box-shadow: 0 0 0 1px var(--border-subtle);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
-}
-
-.theme-toggle:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.3);
-}
-
-/* Analyze */
-
-.analyze-section {
-  background: linear-gradient(135deg, #0f172a, #020617);
-  border-radius: 18px;
-  padding: 18px 20px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
-}
-
-body[data-theme="light"] .analyze-section {
-  background: linear-gradient(135deg, #e0ebff, #f9fbff);
-  border-color: #d1d5e5;
-  box-shadow: 0 14px 32px rgba(148, 163, 184, 0.35);
-}
-
-.input-wrapper {
-  display: flex;
-  gap: 10px;
-}
-
-.input-wrapper input {
-  flex: 1;
-  padding: 11px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
-  outline: none;
-}
-
-body[data-theme="light"] .input-wrapper input {
-  background: #ffffff;
-  color: #0b1120;
-  border-color: #cbd5f5;
-}
-
-.input-wrapper input::placeholder {
-  color: rgba(148, 163, 184, 0.8);
-}
-
-.input-wrapper button {
-  padding: 11px 22px;
-  border-radius: 999px;
-  border: none;
-  cursor: pointer;
-  background: var(--accent);
-  color: #f9fafb;
-  font-weight: 600;
-  transition: transform 0.08s ease, box-shadow 0.08s ease,
-    background 0.1s ease;
-  box-shadow: 0 12px 28px rgba(0, 168, 255, 0.45);
-}
-
-.input-wrapper button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(0, 168, 255, 0.5);
-  background: #1ec1ff;
-}
-
-.input-wrapper button:active {
-  transform: translateY(0);
-  box-shadow: 0 8px 18px rgba(0, 168, 255, 0.55);
-}
-
-.input-tip {
-  margin: 8px 4px 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.mono {
-  font-family: var(--mono);
-}
-
-/* Cards grid */
-
-.cards-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
-  gap: 18px;
-  margin-top: 22px;
-}
-
-@media (max-width: 860px) {
-  .cards-grid {
-    grid-template-columns: minmax(0, 1fr);
+    tokenCard.classList.remove("hidden");
+    riskCard.classList.remove("hidden");
+    chartsSection.classList.remove("hidden");
+    statusMsg.textContent =
+      "Token loaded successfully. Always cross-check with the official explorer.";
+  } catch (err) {
+    console.error(err);
+    statusMsg.textContent = "Failed to load token data.";
   }
 }
 
-/* Cards */
+function fillTokenInfo(address, token, networkKey) {
+  const titleEl = document.getElementById("tokenTitle");
+  const addrShortEl = document.getElementById("tokenAddressShort");
+  const avatarEl = document.getElementById("tokenAvatar");
+  const explorerLink = document.getElementById("explorerLink");
 
-.card {
-  background: var(--bg-card);
-  border-radius: 18px;
-  padding: 18px 18px 16px;
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.9);
-  opacity: 0;
-  transform: translateY(10px);
-  animation: fadeUp 0.25s ease forwards;
+  document.getElementById("tName").textContent = token.name || "-";
+  document.getElementById("tSymbol").textContent = token.symbol || "-";
+  document.getElementById("tDecimals").textContent =
+    token.decimals ?? "unknown";
+  document.getElementById("tSupplyRaw").textContent =
+    token.totalSupply || "-";
+
+  const human = formatHumanSupply(token.totalSupply, token.decimals);
+  document.getElementById("tSupplyHuman").textContent = human;
+
+  titleEl.textContent = `${token.name || "Token"} (${token.symbol || "?"})`;
+  const shortAddr = shortenAddress(address);
+  addrShortEl.textContent = shortAddr;
+  addrShortEl.dataset.full = address;
+
+  const network = NETWORKS[networkKey] || NETWORKS.arcTestnet;
+  explorerLink.href = `${network.explorerBase}/token/${address}`;
+
+  const label =
+    (token.symbol && token.symbol[0]) ||
+    (token.name && token.name[0]) ||
+    "?";
+
+  avatarEl.textContent = label.toUpperCase();
 }
 
-body[data-theme="light"] .card {
-  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.45);
+function shortenAddress(addr) {
+  if (!addr || addr.length < 10) return addr;
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
-.hidden {
-  display: none !important;
-}
+function formatHumanSupply(raw, decimals) {
+  if (!raw) return "-";
+  try {
+    const d = Number(decimals || 0);
+    const big = BigInt(raw);
+    if (d <= 0) return big.toLocaleString("en-US");
 
-/* Aparecer suave quando tirar hidden via JS */
-.card-animated {
-  opacity: 0;
-  transform: translateY(10px);
-  animation: fadeUp 0.25s ease forwards;
-}
+    const factor = BigInt(10) ** BigInt(d);
+    const intPart = big / factor;
+    const fracPart = big % factor;
 
-@keyframes fadeUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    let fracStr = fracPart.toString().padStart(d, "0");
+    fracStr = fracStr.slice(0, 4);
+
+    return `${intPart.toLocaleString("en-US")}.${fracStr}`;
+  } catch (e) {
+    return raw;
   }
 }
 
-/* Risk card */
+/* ---------------------------------------
+   RISK ENGINE + ICONS + GLOW + BREAKDOWN
+---------------------------------------- */
 
-.risk-card h2 {
-  margin: 6px 0 6px;
-  font-size: 18px;
-}
+function applyRiskSignal(address, token) {
+  const normalized = address.toLowerCase();
+  const trusted = TRUSTED_TOKENS[normalized];
 
-.risk-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-}
+  const riskPill = document.getElementById("riskPill");
+  const riskTitle = document.getElementById("riskTitle");
+  const riskDesc = document.getElementById("riskDescription");
+  const verifiedBadge = document.getElementById("verifiedBadge");
 
-.risk-pill {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
+  // reset
+  riskPill.className = "risk-pill";
+  verifiedBadge.classList.add("hidden");
 
-/* cinza */
-.risk-unknown {
-  background: rgba(148, 163, 184, 0.15);
-  color: var(--unknown);
-  border: 1px solid rgba(148, 163, 184, 0.7);
-}
+  const breakdown = [];
+  let totalScore = 0;
 
-/* verde */
-.risk-safe {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--safe);
-  border: 1px solid rgba(34, 197, 94, 0.6);
-}
+  /* ========= TRUSTED (LISTA) ========= */
+  if (trusted) {
+    riskPill.textContent = "🟢 Trusted";
+    riskPill.classList.add("risk-safe");
+    verifiedBadge.classList.remove("hidden");
 
-/* amarelo */
-.risk-warning {
-  background: rgba(252, 211, 77, 0.12);
-  color: var(--warning);
-  border: 1px solid rgba(252, 211, 77, 0.7);
-}
+    riskTitle.textContent = `${token.symbol || "Token"} is marked as trusted.`;
+    riskDesc.textContent =
+      trusted.note +
+      " · Still, always verify URLs, contracts and documentation.";
 
-/* vermelho */
-.risk-danger {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--danger);
-  border: 1px solid rgba(248, 113, 113, 0.8);
-}
+    breakdown.push({
+      label: "Trusted list",
+      score: 0,
+      icon: "🟢",
+      reason: "This contract is explicitly allowlisted as an official token."
+    });
 
-/* Glow animation for high risk */
-.glow-danger {
-  animation: pulseGlow 1.4s infinite ease-in-out;
-}
-
-@keyframes pulseGlow {
-  0% {
-    box-shadow: 0 0 6px rgba(255, 0, 0, 0.45);
-  }
-  50% {
-    box-shadow: 0 0 18px rgba(255, 0, 0, 0.9);
-  }
-  100% {
-    box-shadow: 0 0 6px rgba(255, 0, 0, 0.45);
-  }
-}
-
-.verified-badge {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.7);
-  color: #e5f0ff;
-}
-
-.risk-title {
-  margin: 4px 0 4px;
-  font-weight: 600;
-}
-
-.risk-description {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.risk-notes {
-  margin: 10px 0 0;
-  padding-left: 20px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-/* Token card */
-
-.token-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.token-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 0, #38bdf8, #1e293b);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 18px;
-  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.7);
-}
-
-body[data-theme="light"] .token-avatar {
-  background: radial-gradient(circle at 30% 0, #2563eb, #0f172a);
-}
-
-.token-header-main {
-  flex: 1;
-}
-
-.token-card h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.token-address-short {
-  margin: 3px 0 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.token-address-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.copy-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 10px;
-  cursor: pointer;
-  background: var(--bg-card-soft);
-  color: var(--text-main);
-  border: 1px solid var(--border-subtle);
-}
-
-.copy-btn.copied {
-  background: var(--accent-soft);
-}
-
-.explorer-link {
-  display: inline-block;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.explorer-link:hover {
-  text-decoration: underline;
-}
-
-.token-fields {
-  margin-top: 10px;
-}
-
-.field-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px dashed rgba(31, 41, 55, 0.7);
-}
-
-body[data-theme="light"] .field-row {
-  border-bottom-color: rgba(148, 163, 184, 0.7);
-}
-
-.field-row:last-child {
-  border-bottom: none;
-}
-
-.field-label {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.field-value {
-  font-size: 13px;
-}
-
-.status-msg {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Charts section */
-
-.charts-section {
-  margin-top: 22px;
-}
-
-.charts-hint {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.charts-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-
-.chart-block {
-  background: var(--bg-card-soft);
-  border-radius: 14px;
-  padding: 10px 10px 14px;
-  border: 1px solid rgba(31, 41, 55, 0.9);
-}
-
-body[data-theme="light"] .chart-block {
-  border-color: #cbd5f5;
-}
-
-.chart-block h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
-}
-
-/* canvas responsivo */
-.chart-block canvas {
-  width: 100% !important;
-  max-height: 220px;
-}
-
-/* breakdown list */
-
-.risk-breakdown {
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(55, 65, 81, 0.9);
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-body[data-theme="light"] .risk-breakdown {
-  border-top-color: #cbd5f5;
-}
-
-.risk-breakdown h3 {
-  margin: 0 0 6px;
-  font-size: 14px;
-}
-
-.risk-breakdown ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
-}
-
-.risk-breakdown li {
-  margin-bottom: 3px;
-}
-
-/* Footer */
-
-.app-footer {
-  margin-top: 20px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* Responsivo extra para mobile */
-
-@media (max-width: 640px) {
-  .app-shell {
-    margin-top: 24px;
+    return {
+      level: "safe",
+      totalScore,
+      breakdown
+    };
   }
 
-  .app-header h1 {
-    font-size: 24px;
+  // --------- DECIMALS ----------
+  let decimalsScore = 0;
+  const decimals = Number(token.decimals || 0);
+  if (decimals > 18 || decimals === 0) {
+    decimalsScore += 2;
+  }
+  breakdown.push({
+    label: "Decimals",
+    score: decimalsScore,
+    icon: decimalsScore ? "⚠️" : "✅",
+    reason:
+      decimals === 0
+        ? "Token has 0 decimals — unusual for most mainstream ERC-20 tokens."
+        : decimals > 18
+        ? "Token uses very high decimals — can be used to mislead users."
+        : "Decimals in a typical range."
+  });
+  totalScore += decimalsScore;
+
+  // --------- NAME / SYMBOL ----------
+  let nameSymbolScore = 0;
+  const name = token.name || "";
+  const symbol = token.symbol || "";
+
+  if (!name || name.length < 3) nameSymbolScore += 1;
+  if (!symbol || symbol.length < 2 || symbol.length > 8) nameSymbolScore += 1;
+
+  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "BNB", "ARB", "MATIC"];
+  let impersonationScore = 0;
+  if (famousSymbols.includes(symbol.toUpperCase()) && !TRUSTED_TOKENS[normalized]) {
+    impersonationScore += 3;
   }
 
-  .top-bar {
-    flex-direction: column;
-    align-items: flex-start;
+  breakdown.push({
+    label: "Name / Symbol",
+    score: nameSymbolScore,
+    icon: nameSymbolScore ? "⚠️" : "✅",
+    reason:
+      nameSymbolScore > 0
+        ? "Name or symbol length looks unusual for a production token."
+        : "Name and symbol look reasonably structured."
+  });
+
+  breakdown.push({
+    label: "Impersonation",
+    score: impersonationScore,
+    icon: impersonationScore ? "🚩" : "✅",
+    reason:
+      impersonationScore > 0
+        ? `Symbol matches a well-known asset (${symbol}) but contract is not allowlisted — possible impersonation.`
+        : "No obvious symbol impersonation detected."
+  });
+
+  totalScore += nameSymbolScore + impersonationScore;
+
+  // --------- SUPPLY ----------
+  let supplyScore = 0;
+  const supplyStr = token.totalSupply || "0";
+  let supply = 0n;
+  try {
+    supply = BigInt(supplyStr);
+  } catch {}
+
+  if (supply === 0n) supplyScore += 2;
+  if (supply > 10n ** 40n) supplyScore += 2;
+
+  breakdown.push({
+    label: "Total supply",
+    score: supplyScore,
+    icon: supplyScore ? "⚠️" : "✅",
+    reason:
+      supply === 0n
+        ? "Total supply is zero — token may be defunct or misconfigured."
+        : supply > 10n ** 40n
+        ? "Extremely large supply — often used in low-quality or spam tokens."
+        : "Supply looks within a normal range for ERC-20 style assets."
+  });
+  totalScore += supplyScore;
+
+  // --------- ADDRESS PATTERN ----------
+  let addrScore = 0;
+  if (normalized.startsWith("0x000000")) addrScore += 2;
+
+  breakdown.push({
+    label: "Address pattern",
+    score: addrScore,
+    icon: addrScore ? "⚠️" : "✅",
+    reason:
+      addrScore > 0
+        ? "Contract address starts with many zeros — this can be generated to look 'special' and mislead."
+        : "Contract address pattern is not inherently suspicious."
+  });
+  totalScore += addrScore;
+
+  // --------- ABI / VERIFICATION (placeholder testnet) ----------
+  const abiScore = 0;
+  breakdown.push({
+    label: "Contract verification",
+    score: abiScore,
+    icon: "ℹ️",
+    reason:
+      "Verification status is not available on this testnet endpoint. On mainnet, a non-verified contract would be a strong red flag."
+  });
+
+  // --------- HONEYPOT (placeholder) ----------
+  const honeypotScore = 0;
+  breakdown.push({
+    label: "Honeypot checks",
+    score: honeypotScore,
+    icon: "ℹ️",
+    reason:
+      "Static honeypot analysis (buy/sell simulation, blacklist checks) is not enabled on this testnet version."
+  });
+
+  // --------- CREATION TIME (placeholder) ----------
+  const creationScore = 0;
+  breakdown.push({
+    label: "Creation age",
+    score: creationScore,
+    icon: "ℹ️",
+    reason:
+      "Creation block / age data is not exposed by this API on testnet. On mainnet, extremely new contracts are usually higher risk."
+  });
+
+  totalScore += abiScore + honeypotScore + creationScore;
+
+  // --------- SCORE → LEVEL ----------
+  let level = "safe";
+  if (totalScore >= 8) level = "danger";
+  else if (totalScore >= 4) level = "warning";
+  else if (totalScore >= 1) level = "caution";
+
+  if (level === "safe") {
+    riskPill.textContent = "🟢 Likely Safe";
+    riskPill.classList.add("risk-safe");
+    riskTitle.textContent = "No major heuristic red flags detected.";
+    riskDesc.textContent =
+      "This does NOT guarantee safety — it only means basic structural checks did not find severe issues. Always do your own research.";
+  } else if (level === "caution") {
+    riskPill.textContent = "⚠️ Caution";
+    riskPill.classList.add("risk-warning");
+    riskTitle.textContent = "Minor suspicious characteristics detected.";
+    riskDesc.textContent =
+      "Some aspects (decimals, naming or supply) look slightly unusual. Review this contract carefully before interacting.";
+  } else if (level === "warning") {
+    riskPill.textContent = "⚠️ Risky";
+    riskPill.classList.add("risk-warning");
+    riskTitle.textContent = "Several heuristic red flags were found.";
+    riskDesc.textContent =
+      "The token's configuration suggests higher-than-normal risk. Interact only if you fully understand the project.";
+  } else {
+    riskPill.textContent = "🔥 High Risk";
+    riskPill.classList.add("risk-danger", "glow-danger");
+    riskTitle.textContent = "Strong red flags — avoid this token.";
+    riskDesc.textContent =
+      "Based on decimals, supply, naming and address pattern, this token looks extremely risky. Avoid interacting.";
   }
 
-  .analyze-section {
-    padding: 14px 14px 12px;
+  return {
+    level,
+    totalScore,
+    breakdown
+  };
+}
+
+/* ---------------------------------------
+   CHARTS + BREAKDOWN RENDER
+---------------------------------------- */
+
+function updateChartsAndBreakdown(address, token, riskResult) {
+  const { level, totalScore, breakdown } = riskResult;
+
+  // PIE
+  const levelData = {
+    safe: level === "safe" ? 1 : 0,
+    caution: level === "caution" ? 1 : 0,
+    warning: level === "warning" ? 1 : 0,
+    danger: level === "danger" ? 1 : 0
+  };
+
+  const ctxPie = document.getElementById("riskPieChart");
+  if (riskPieChart) riskPieChart.destroy();
+  riskPieChart = new Chart(ctxPie, {
+    type: "pie",
+    data: {
+      labels: ["Safe", "Caution", "Risky", "High risk"],
+      datasets: [
+        {
+          data: [
+            levelData.safe,
+            levelData.caution,
+            levelData.warning,
+            levelData.danger
+          ],
+          backgroundColor: [
+            "rgba(34,197,94,0.8)",
+            "rgba(252,211,77,0.9)",
+            "rgba(249,115,22,0.9)",
+            "rgba(248,113,113,0.9)"
+          ]
+        }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { color: "#e5e7eb", boxWidth: 14, font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // BAR: breakdown
+  const labels = breakdown.map((b) => b.label);
+  const scores = breakdown.map((b) => b.score);
+
+  const ctxBar = document.getElementById("riskBarChart");
+  if (riskBarChart) riskBarChart.destroy();
+  riskBarChart = new Chart(ctxBar, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Score",
+          data: scores,
+          backgroundColor: "rgba(59,130,246,0.8)"
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: {
+          ticks: { color: "#e5e7eb", font: { size: 10 } }
+        },
+        y: {
+          ticks: { color: "#e5e7eb", stepSize: 1 },
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: "#e5e7eb" }
+        }
+      }
+    }
+  });
+
+  // LINE: cumulative
+  let cumulative = 0;
+  const cumData = breakdown.map((b) => {
+    cumulative += b.score;
+    return cumulative;
+  });
+
+  const ctxLine = document.getElementById("riskLineChart");
+  if (riskLineChart) riskLineChart.destroy();
+  riskLineChart = new Chart(ctxLine, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Cumulative risk score",
+          data: cumData,
+          borderColor: "rgba(249,115,22,0.9)",
+          borderWidth: 2,
+          tension: 0.25,
+          pointRadius: 3
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: { ticks: { color: "#e5e7eb", font: { size: 10 } } },
+        y: {
+          ticks: { color: "#e5e7eb", stepSize: 1 },
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        legend: { labels: { color: "#e5e7eb" } }
+      }
+    }
+  });
+
+  // SUPPLY comparison
+  const ctxSupply = document.getElementById("supplyBarChart");
+  if (supplyBarChart) supplyBarChart.destroy();
+
+  const normalized = address.toLowerCase();
+  const trusted = TRUSTED_TOKENS[normalized];
+  let thisSupply = 0;
+  let usdcSupply = 0;
+
+  try {
+    thisSupply = Number(token.totalSupply || "0");
+  } catch {}
+
+  if (trusted && trusted.refSupply) {
+    try {
+      usdcSupply = Number(trusted.refSupply);
+    } catch {}
+  } else {
+    try {
+      usdcSupply = Number(
+        TRUSTED_TOKENS["0x3600000000000000000000000000000000000000"].refSupply
+      );
+    } catch {}
   }
 
-  .input-wrapper {
-    flex-direction: column;
-  }
+  const norm = (n) => (n === 0 ? 0 : Math.log10(n + 1));
 
-  .input-wrapper button {
-    width: 100%;
-  }
+  supplyBarChart = new Chart(ctxSupply, {
+    type: "bar",
+    data: {
+      labels: ["This token", "USDC (ref)"],
+      datasets: [
+        {
+          data: [norm(thisSupply), norm(usdcSupply)],
+          backgroundColor: ["rgba(96,165,250,0.9)", "rgba(16,185,129,0.9)"]
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: { ticks: { color: "#e5e7eb" } },
+        y: {
+          ticks: { color: "#e5e7eb" },
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
 
-  .charts-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  renderRiskBreakdown(level, totalScore, breakdown);
+}
+
+function renderRiskBreakdown(level, totalScore, breakdown) {
+  const container = document.getElementById("riskBreakdown");
+
+  let levelLabel =
+    level === "safe"
+      ? "Likely Safe"
+      : level === "caution"
+      ? "Caution"
+      : level === "warning"
+      ? "Risky"
+      : "High Risk";
+
+  const html = [
+    `<h3>Why this rating? (${levelLabel}, score ${totalScore})</h3>`,
+    "<ul>",
+    ...breakdown.map(
+      (b) =>
+        `<li>${b.icon} <strong>${b.label}:</strong> ${b.reason} ${
+          b.score ? `(score +${b.score})` : ""
+        }</li>`
+    ),
+    "</ul>"
+  ].join("");
+
+  container.innerHTML = html;
 }
