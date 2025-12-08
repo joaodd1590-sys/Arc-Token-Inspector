@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Arc Token Inspector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <h1>Arc Token Inspector</h1>
+      <p class="sub">
+        Explorer + Risk Analyzer para tokens da Arc (sem conectar carteira).
+      </p>
+    </header>
+
+    <!-- Busca de token específico -->
+    <section class="panel search-panel">
+      <h2 class="panel-title">Analisar token por endereço</h2>
+      <p class="panel-sub">
+        Cole o endereço do contrato ERC-20 na Arc Testnet para ver detalhes e risco.
+      </p>
+      <div class="search-row">
+        <input
+          id="tokenSearch"
+          type="text"
+          placeholder="0x... endereço do token"
+        />
+        <button id="analyzeBtn" class="btn primary">Analisar</button>
+      </div>
+      <div id="searchError" class="error-msg hidden"></div>
+      <div id="searchResult" class="token-card hidden"></div>
+    </section>
+
+    <!-- Lista de tokens populares / detectados -->
+    <section class="panel list-panel">
+      <div class="list-header">
+        <div>
+          <h2 class="panel-title">Tokens na Arc</h2>
+          <p class="panel-sub">
+            Lista de tokens detectados via ArcScan / Blockscout. Selecione um para ver risco.
+          </p>
+        </div>
+        <div class="filters">
+          <button class="chip active" data-filter="all">Todos</button>
+          <button class="chip" data-filter="trusted">Confiáveis</button>
+          <button class="chip" data-filter="unknown">Desconhecido</button>
+          <button class="chip" data-filter="danger">Não seguro</button>
+        </div>
+      </div>
+
+      <div id="tokensTableWrapper" class="table-wrapper">
+        <div id="tokensLoading" class="info-msg">Carregando tokens da Arc...</div>
+        <table id="tokensTable" class="token-table hidden">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Endereço</th>
+              <th>Holders</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tokensTbody">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Legenda / explicação de risco -->
+    <section class="panel legend-panel">
+      <h2 class="panel-title">Como o status de risco é calculado?</h2>
+      <ul class="legend-list">
+        <li>
+          <span class="badge status-trusted">Confiável</span>
+          Contrato verificado, vários holders, algum tempo de vida, sem funções óbvias de abuso.
+        </li>
+        <li>
+          <span class="badge status-unknown">Desconhecido</span>
+          Novo, poucos holders ou pouco uso. Não necessariamente malicioso, mas exige cautela.
+        </li>
+        <li>
+          <span class="badge status-danger">Não seguro</span>
+          Contrato não verificado, funções sensíveis (mint ilimitado, blacklist, pause) ou padrões suspeitos.
+        </li>
+      </ul>
+      <p class="panel-sub">
+        Este dApp é apenas um <strong>indicador educativo</strong>. Sempre faça sua própria pesquisa
+        antes de interagir com qualquer token.
+      </p>
+    </section>
+
+    <footer class="foot">
+      Construído por João Carlos • Arc Community • Sem conexão de carteira 🔒
+    </footer>
+  </div>
+
+  <script src="tokens.js"></script>
+</body>
+</html>
