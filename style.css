@@ -1,0 +1,289 @@
+:root {
+  --bg: #05040b;
+  --panel: #111322;
+  --panel-soft: rgba(255, 255, 255, 0.02);
+  --accent: #5bffe0;
+  --accent-soft: rgba(91, 255, 224, 0.45);
+  --danger: #ff4d7a;
+  --unknown: #ffc94d;
+  --text: #e7edf9;
+  --muted: #97a1be;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top, #191c35 0, var(--bg) 55%);
+  color: var(--text);
+}
+
+.wrap {
+  max-width: 1040px;
+  margin: 24px auto 40px;
+  padding: 0 16px;
+}
+
+/* Top */
+
+.top {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.top h1 {
+  font-size: 28px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.top .sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Panels */
+
+.panel {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 16px 14px 18px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 26px rgba(0, 0, 0, 0.65);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Search */
+
+.search-panel .search-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #090a14;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #020609;
+  box-shadow: 0 0 14px var(--accent-soft);
+}
+
+.btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px var(--accent-soft);
+}
+
+/* Error / info */
+
+.error-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.info-msg {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Token card (resultado da busca) */
+
+.token-card {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+  border: 1px dashed var(--border);
+  font-size: 13px;
+}
+
+.token-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.token-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.token-addr {
+  font-family: "Inconsolata", monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.token-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Status badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-trusted {
+  background: linear-gradient(90deg, #00ffa5, var(--accent));
+  color: #04120c;
+}
+
+.status-unknown {
+  background: linear-gradient(90deg, #ffe27a, var(--unknown));
+  color: #2b1c00;
+}
+
+.status-danger {
+  background: linear-gradient(90deg, #ff4d7a, #ff8fb0);
+  color: #2b020b;
+}
+
+/* Table list */
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.chip.active,
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-soft);
+}
+
+.table-wrapper {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.token-table thead {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.token-table th,
+.token-table td {
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.token-table th {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.addr-small {
+  font-family: "Inconsolata", monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Legend */
+
+.legend-list {
+  margin: 8px 0 0 18px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.legend-list li {
+  margin-bottom: 6px;
+}
+
+/* Footer */
+
+.foot {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Responsivo */
+
+@media (max-width: 720px) {
+  .wrap {
+    margin-top: 16px;
+  }
+}
