@@ -3,103 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <title>Arc Token Inspector</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- No favicon on purpose (you said you don't want an icon here) -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <h1>ARC TOKEN INSPECTOR</h1>
-      <p class="sub">
-        Explorer + Risk Analyzer for tokens on the Arc Testnet (no wallet connection required).
+  <div class="page-wrap">
+    <header class="top-header">
+      <h1 class="app-title">ARC TOKEN INSPECTOR</h1>
+      <p class="app-subtitle">
+        Explorer + Risk Analyzer for tokens on Arc Testnet (no wallet connection required).
       </p>
     </header>
 
-    <!-- Search token by address -->
-    <section class="panel search-panel">
-      <h2 class="panel-title">Analyze Token by Address</h2>
-      <p class="panel-sub">
-        Paste the ERC-20 contract address on Arc Testnet to view details and risk score.
-      </p>
+    <!-- ANALYZE BY ADDRESS -->
+    <section class="panel panel-analyze">
+      <div class="panel-header">
+        <h2>Analyze token by address</h2>
+        <p class="panel-sub">
+          Paste an ERC-20 contract address on Arc Testnet to see basic details and a risk status.
+        </p>
+      </div>
 
-      <div class="search-row">
+      <form id="analyzeForm" class="analyze-form">
         <input
-          id="tokenSearch"
+          id="tokenAddress"
+          class="input-address"
           type="text"
           placeholder="0x... token contract address"
+          autocomplete="off"
         />
-        <button id="analyzeBtn" class="btn primary">Analyze</button>
+        <button id="analyzeBtn" type="submit" class="btn-primary">
+          Analyze
+        </button>
+      </form>
+
+      <!-- Result of manual analysis -->
+      <div id="analyzeResult" class="analyze-result hidden">
+        <div class="analyze-header">
+          <span id="analyzeName" class="result-name"></span>
+          <span id="analyzeStatus" class="status-pill"></span>
+        </div>
+        <div class="analyze-body">
+          <div class="result-row">
+            <span class="label">Address</span>
+            <span class="value">
+              <span id="analyzeAddress" class="mono"></span>
+              <button id="copyAnalyzeAddress" class="btn-ghost btn-copy" type="button">
+                Copy
+              </button>
+            </span>
+          </div>
+          <div class="result-row">
+            <span class="label">Holders (est.)</span>
+            <span id="analyzeHolders" class="value"></span>
+          </div>
+          <div class="result-row">
+            <span class="label">Notes</span>
+            <span id="analyzeNotes" class="value"></span>
+          </div>
+        </div>
       </div>
 
-      <div id="searchError" class="error-msg hidden"></div>
-      <div id="searchResult" class="token-card hidden"></div>
+      <div id="analyzeEmptyHint" class="analyze-hint">
+        Tip: you can also pick any token from the list below and click <b>View</b>
+        to see its details here.
+      </div>
     </section>
 
-    <!-- Token list -->
-    <section class="panel list-panel">
-      <div class="list-header">
-        <div>
-          <h2 class="panel-title">Tokens on Arc</h2>
-          <p class="panel-sub">
-            List of tokens detected via ArcScan / Blockscout. Select one to view its risk rating.
-          </p>
-        </div>
-
-        <div class="filters">
-          <button class="chip active" data-filter="all">All</button>
-          <button class="chip" data-filter="trusted">Trusted</button>
-          <button class="chip" data-filter="unknown">Unknown</button>
-          <button class="chip" data-filter="danger">Not Safe</button>
-        </div>
+    <!-- TOKEN LIST -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Tokens on Arc</h2>
+        <p class="panel-sub">
+          Sample list of tokens detected via on-chain scanners. This is a demo list for Arc Testnet.
+        </p>
       </div>
 
-      <div id="tokensTableWrapper" class="table-wrapper">
-        <div id="tokensLoading" class="info-msg">Loading tokens from Arc...</div>
+      <!-- Filters -->
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="trusted">Trusted</button>
+        <button class="filter-btn" data-filter="unknown">Unknown</button>
+        <button class="filter-btn" data-filter="risky">Risky</button>
+      </div>
 
-        <table id="tokensTable" class="token-table hidden">
+      <div class="table-wrap">
+        <table class="token-table">
           <thead>
             <tr>
               <th>Token</th>
               <th>Address</th>
               <th>Holders</th>
               <th>Status</th>
-              <th></th>
+              <th class="col-actions">Actions</th>
             </tr>
           </thead>
-
-          <tbody id="tokensTbody"></tbody>
+          <tbody id="tokenTableBody">
+            <!-- Populated by tokens.js -->
+          </tbody>
         </table>
       </div>
     </section>
 
-    <!-- Risk criteria -->
-    <section class="panel legend-panel">
-      <h2 class="panel-title">How is the risk score calculated?</h2>
+    <!-- RISK LEGEND -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>How is the risk status calculated?</h2>
+      </div>
 
       <ul class="legend-list">
         <li>
-          <span class="badge status-trusted">Trusted</span>
-          Verified contract, multiple holders, some time online, no abusive functions.
+          <span class="status-pill status-trusted">Trusted</span>
+          <span class="legend-text">
+            Verified or long-lived contract, healthy number of holders, no obvious abuse functions.
+          </span>
         </li>
         <li>
-          <span class="badge status-unknown">Unknown</span>
-          New token, few holders or little usage. Not necessarily malicious, but caution is recommended.
+          <span class="status-pill status-unknown">Unknown</span>
+          <span class="legend-text">
+            New token or very few holders. Not necessarily malicious, but treat with caution.
+          </span>
         </li>
         <li>
-          <span class="badge status-danger">Not Safe</span>
-          Unverified contract, sensitive functions (unlimited mint, blacklist, pause), or suspicious patterns.
+          <span class="status-pill status-risky">Risky</span>
+          <span class="legend-text">
+            Contract not verified, suspicious functions (limitless mint, blacklist, pause) or
+            strange patterns on-chain.
+          </span>
         </li>
       </ul>
 
-      <p class="panel-sub">
-        This dApp is an <strong>educational risk indicator</strong>. Always DYOR before interacting with any token.
+      <p class="legend-footnote">
+        This dApp is for <b>educational purposes only</b>. Always do your own research before
+        interacting with any token.
       </p>
     </section>
 
-    <footer class="foot">
-      Built by João Carlos • Arc Community • No wallet connection required 🔒
+    <footer class="footer">
+      <span>
+        Built by João Carlos · Arc Ecosystem Community 🚀 · No wallet connection required
+      </span>
     </footer>
   </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="tokens.js"></script>
 </body>
