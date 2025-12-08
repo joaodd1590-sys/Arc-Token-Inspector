@@ -83,6 +83,11 @@ async function handleAnalyze() {
   }
 }
 
+
+// -----------------------------------------------------
+// TOKEN INFO
+// -----------------------------------------------------
+
 function fillTokenInfo(address, token, networkKey) {
   document.getElementById("tName").textContent = token.name;
   document.getElementById("tSymbol").textContent = token.symbol;
@@ -126,27 +131,109 @@ function formatSupply(raw, dec) {
   }
 }
 
+
+// -----------------------------------------------------
+// RISK ENGINE — versão PRO
+// -----------------------------------------------------
+
+const FAMOUS_TOKENS = ["USDC", "USDT", "ETH", "BTC", "BNB", "WETH", "ARB"];
+
 function applyRisk(address, token) {
-  const p = document.getElementById("riskPill");
+  const pill = document.getElementById("riskPill");
   const title = document.getElementById("riskTitle");
   const desc = document.getElementById("riskDescription");
   const badge = document.getElementById("verifiedBadge");
 
-  p.className = "risk-pill";
+  pill.className = "risk-pill";
   badge.classList.add("hidden");
 
-  const norm = address.toLowerCase();
-  if (TRUSTED_TOKENS[norm]) {
-    p.textContent = "Trusted";
-    p.classList.add("risk-safe");
+  const lower = address.toLowerCase();
+
+  // TRUSTED TOKENS
+  if (TRUSTED_TOKENS[lower]) {
+    pill.textContent = "Trusted";
+    pill.classList.add("risk-safe");
     badge.classList.remove("hidden");
     title.textContent = "This token is verified & trusted.";
-    desc.textContent = TRUSTED_TOKENS[norm].note;
+    desc.textContent = TRUSTED_TOKENS[lower].note;
     return;
   }
 
-  p.textContent = "Risky";
-  p.classList.add("risk-warning");
-  title.textContent = "Suspicious characteristics detected.";
-  desc.textContent = "This token may be unsafe. Review carefully.";
+  // ---------------------------
+  // RISK SCORE CALCULATION
+  // ---------------------------
+  let score = 0;
+  let reasons = [];
+
+  // 1. Decimals
+  if (token.decimals === 0 || token.decimals > 18) {
+    score += 2;
+    reasons.push("⚠ Decimals unusual.");
+  }
+
+  // 2. Total supply
+  if (token.totalSupply === "0") {
+    score += 3;
+    reasons.push("⚠ Total supply is zero.");
+  }
+
+  try {
+    if (BigInt(token.totalSupply) > 10n ** 20n) {
+      score += 3;
+      reasons.push("⚠ Supply extremely high.");
+    }
+  } catch {}
+
+  // 3. Impersonation
+  if (FAMOUS_TOKENS.includes(token.symbol?.toUpperCase())) {
+    score += 3;
+    reasons.push("⚠ Symbol matches a famous token (possible impersonation).");
+  }
+
+  // 4. Address pattern suspicious
+  if (/(00000000|fffffff)/.test(address)) {
+    score += 2;
+    reasons.push("⚠ Address contains suspicious patterns.");
+  }
+
+  // 5. Contract verification (future)
+  if (token.verified === false) {
+    score += 3;
+    reasons.push("⚠ Contract is NOT verified.");
+  }
+
+  // 6. Honeypot simulation (fallback)
+  if (token.honeypot === true) {
+    score += 4;
+    reasons.push("🔥 Honeypot behavior detected.");
+  }
+
+  // ---------------------------
+  // APPLY VISUAL RISK STATE
+  // ---------------------------
+  if (score <= 1) {
+    pill.textContent = "Likely Safe";
+    pill.classList.add("risk-safe");
+    title.textContent = "This token appears safe.";
+  } 
+  else if (score <= 4) {
+    pill.textContent = "Caution";
+    pill.classList.add("risk-warning");
+    title.textContent = "Some mild warnings detected.";
+  } 
+  else if (score <= 7) {
+    pill.textContent = "Risky";
+    pill.classList.add("risk-danger");
+    title.textContent = "Multiple suspicious factors found.";
+  } 
+  else {
+    pill.textContent = "High Risk";
+    pill.classList.add("risk-danger", "glow-danger");
+    title.textContent = "High-risk token. Avoid interacting!";
+  }
+
+  // Description
+  desc.innerHTML = reasons.length
+    ? reasons.map(r => `• ${r}`).join("<br>")
+    : "No major red flags detected.";
 }
