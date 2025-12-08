@@ -1,60 +1,75 @@
 export default async function handler(req, res) {
   const { address } = req.query;
 
-  if (!address || !address.startsWith("0x")) {
-    return res.status(400).json({ error: "Invalid or missing token address" });
+  if (!address) {
+    return res.status(400).json({ error: "Missing address parameter" });
+  }
+
+  const RPC_URL = "https://testnet-rpc.arcology.net"; // RPC oficial do ARC Testnet
+
+  // Função genérica para chamar métodos do contrato
+  async function call(methodSignature) {
+    const data = methodSignature; // já em formato hex
+    const body = {
+      jsonrpc: "2.0",
+      method: "eth_call",
+      params: [
+        {
+          to: address,
+          data: data
+        },
+        "latest"
+      ],
+      id: 1
+    };
+
+    const response = await fetch(RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const json = await response.json();
+
+    return json.result;
   }
 
   try {
-    // 1️⃣ Buscar HTML inicial para extrair o buildId
-    const htmlResp = await fetch("https://testnet.arcscan.app");
-    const html = await htmlResp.text();
+    // --- CALLS ---
 
-    const buildIdMatch = html.match(/"buildId":"([^"]+)"/);
+    const nameHex = await call("0x06fdde03"); // name()
+    const symbolHex = await call("0x95d89b41"); // symbol()
+    const decimalsHex = await call("0x313ce567"); // decimals()
+    const totalSupplyHex = await call("0x18160ddd"); // totalSupply()
 
-    if (!buildIdMatch) {
-      return res.status(500).json({ error: "Failed to detect ArcScan build ID" });
-    }
+    // --- Convertendo os retornos ---
 
-    const buildId = buildIdMatch[1];
+    const name = Buffer.from(nameHex.replace("0x", "").slice(128), "hex")
+      .toString()
+      .replace(/\u0000/g, "");
 
-    // 2️⃣ Montar URL correta da API de detalhes do token
-    const url =
-      `https://testnet.arcscan.app/_next/data/${buildId}/address/${address}.json?hash=${address}`;
+    const symbol = Buffer.from(symbolHex.replace("0x", "").slice(128), "hex")
+      .toString()
+      .replace(/\u0000/g, "");
 
-    const apiResp = await fetch(url);
+    const decimals = parseInt(decimalsHex, 16);
 
-    if (!apiResp.ok) {
-      return res.status(500).json({
-        error: "Arc internal API error (details request)",
-        status: apiResp.status
-      });
-    }
+    const totalSupply = BigInt(totalSupplyHex).toString();
 
-    const data = await apiResp.json();
-
-    // 3️⃣ Extrair as informações do token
-    const token = data?.pageProps?.addressData;
-
-    if (!token) {
-      return res.status(404).json({ error: "Token not found" });
-    }
-
-    // 4️⃣ Normalizar os dados
-    const formatted = {
-      name: token?.metadata?.name || token?.symbol || "Unknown",
-      symbol: token?.metadata?.symbol || "???",
-      decimals: token?.metadata?.decimals || null,
-      totalSupply: token?.totalSupply || null,
-      type: token?.type || null,
-      holders: token?.holderCount || token?.holders || null,
-      transfers: token?.transferCount || null
-    };
-
-    return res.status(200).json(formatted);
+    // resposta final
+    return res.status(200).json({
+      name,
+      symbol,
+      decimals,
+      totalSupply,
+      holders: null, // não disponível via RPC
+      transfers: null // idem
+    });
 
   } catch (err) {
-    console.error("Proxy error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      error: "Failed to fetch token data",
+      details: err.message
+    });
   }
 }
