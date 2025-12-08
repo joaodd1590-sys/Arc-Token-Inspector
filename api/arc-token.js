@@ -12,42 +12,56 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔥 URL interna oficial usada pelo ArcScan (Next.js data fetch)
-    const ARC_INTERNAL_URL =
-      `https://testnet.arcscan.app/_next/data/PT2Y1HFDaA9IV807_Kj/advanced-filter.json` +
+    // 1️⃣ Buscar HTML inicial do ArcScan para extrair o buildId
+    const htmlResp = await fetch("https://testnet.arcscan.app", {
+      headers: { "user-agent": "Arc-Inspector" }
+    });
+
+    const html = await htmlResp.text();
+
+    // 2️⃣ Capturar automaticamente o buildId do Next.js
+    const buildIdMatch = html.match(/"buildId":"([^"]+)"/);
+
+    if (!buildIdMatch) {
+      return res.status(500).json({ error: "Failed to fetch ArcScan buildId" });
+    }
+
+    const buildId = buildIdMatch[1];
+
+    // 3️⃣ Agora montamos a URL REAL do ArcScan com o buildId atualizado
+    const apiUrl =
+      `https://testnet.arcscan.app/_next/data/${buildId}/advanced-filter.json` +
       `?token_contract_address_hashes_to_include=${address}`;
 
-    const resp = await fetch(ARC_INTERNAL_URL, {
+    const apiResp = await fetch(apiUrl, {
       headers: {
         "accept": "application/json",
-        "user-agent": "Arc-Token-Inspector/1.0"
+        "user-agent": "Arc-Inspector"
       }
     });
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("Arc internal error:", resp.status, errText);
-      res.status(resp.status).json({ error: "Arc internal API error" });
-      return;
+    if (!apiResp.ok) {
+      const text = await apiResp.text();
+      console.error("Arc error:", apiResp.status, text);
+      return res.status(500).json({ error: "Arc internal API error" });
     }
 
-    const raw = await resp.json();
+    const data = await apiResp.json();
 
-    // Estrutura real do Next.js:
-    // raw.pageProps.tokens.items[0]
-    const item = raw?.pageProps?.tokens?.items?.[0];
+    // 4️⃣ Acessar o token
+    const item = data?.pageProps?.tokens?.items?.[0];
 
     if (!item) {
-      res.status(404).json({ error: "Token not found in Arc internal API" });
-      return;
+      return res.status(404).json({ error: "Token not found" });
     }
 
+    // 5️⃣ Formatar resposta
     const token = {
       name: item.name || "Unknown",
       symbol: item.symbol || "???",
       decimals: item.decimals || null,
       totalSupply: item.total_supply || null,
-      holders: item.holders || item.holder_count || null
+      holders: item.holders || item.holder_count || null,
     };
 
     res.status(200).json(token);
