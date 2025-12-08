@@ -5,71 +5,74 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing address parameter" });
   }
 
-  const RPC_URL = "https://testnet-rpc.arcology.net"; // RPC oficial do ARC Testnet
+  const RPC_URL = "https://rpc-testnet.arc.market";
 
-  // Função genérica para chamar métodos do contrato
-  async function call(methodSignature) {
-    const data = methodSignature; // já em formato hex
+  async function rpcCall(dataHex) {
     const body = {
       jsonrpc: "2.0",
       method: "eth_call",
       params: [
-        {
-          to: address,
-          data: data
-        },
+        { to: address, data: dataHex },
         "latest"
       ],
       id: 1
     };
 
-    const response = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
+    try {
+      const response = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    const json = await response.json();
+      if (!response.ok) {
+        throw new Error("RPC responded with status " + response.status);
+      }
 
-    return json.result;
+      const json = await response.json();
+
+      if (!json.result) {
+        throw new Error("RPC returned null result");
+      }
+
+      return json.result;
+
+    } catch (err) {
+      console.error("RPC error:", err);
+      throw err;
+    }
   }
 
   try {
-    // --- CALLS ---
+    const nameHex    = await rpcCall("0x06fdde03"); // name()
+    const symbolHex  = await rpcCall("0x95d89b41"); // symbol()
+    const decimalsHex = await rpcCall("0x313ce567"); // decimals()
+    const totalSupplyHex = await rpcCall("0x18160ddd"); // totalSupply()
 
-    const nameHex = await call("0x06fdde03"); // name()
-    const symbolHex = await call("0x95d89b41"); // symbol()
-    const decimalsHex = await call("0x313ce567"); // decimals()
-    const totalSupplyHex = await call("0x18160ddd"); // totalSupply()
+    function decodeString(hex) {
+      const clean = hex.replace("0x", "");
+      const str = Buffer.from(clean.slice(128), "hex").toString();
+      return str.replace(/\u0000/g, "");
+    }
 
-    // --- Convertendo os retornos ---
-
-    const name = Buffer.from(nameHex.replace("0x", "").slice(128), "hex")
-      .toString()
-      .replace(/\u0000/g, "");
-
-    const symbol = Buffer.from(symbolHex.replace("0x", "").slice(128), "hex")
-      .toString()
-      .replace(/\u0000/g, "");
-
+    const name = decodeString(nameHex);
+    const symbol = decodeString(symbolHex);
     const decimals = parseInt(decimalsHex, 16);
-
     const totalSupply = BigInt(totalSupplyHex).toString();
 
-    // resposta final
     return res.status(200).json({
       name,
       symbol,
       decimals,
       totalSupply,
-      holders: null, // não disponível via RPC
-      transfers: null // idem
+      holders: null,
+      transfers: null
     });
 
   } catch (err) {
     return res.status(500).json({
       error: "Failed to fetch token data",
-      details: err.message
+      details: err.message,
     });
   }
 }
