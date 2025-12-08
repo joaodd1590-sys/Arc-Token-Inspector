@@ -10,37 +10,36 @@ export default async function handler(req, res) {
   }
 
   try {
-    // URL do ArcScan NEXT API (modelo real)
-    const ARC_URL = `https://testnet.arcscan.app/_next/data/YITlUVkOslu2CqsxW5-nd/address/${address}.json?hash=${address}`;
+    // Endpoint público REAL do ArcScan
+    const ARC_PUBLIC_URL = `https://testnet.arcscan.app/api?module=token&action=getToken&contractaddress=${address}`;
 
-    const response = await fetch(ARC_URL, {
+    const resp = await fetch(ARC_PUBLIC_URL, {
       headers: {
-        "accept": "application/json",
+        accept: "application/json",
         "user-agent": "Arc-Token-Inspector/1.0"
       }
     });
 
-    if (!response.ok) {
-      return res.status(500).json({ error: "Arc API returned error" });
+    if (!resp.ok) {
+      return res.status(resp.status).json({
+        error: "Arc API returned an error"
+      });
     }
 
-    const data = await response.json();
+    const raw = await resp.json();
 
-    // DADOS PUROS DO ARC
-    const info = data?.pageProps?.details;
-
+    // Resultado "limpo" que você vai usar no frontend
     const token = {
-      name: info?.name || "Unknown",
-      symbol: info?.symbol || "???",
-      decimals: info?.decimals ?? null,
-      totalSupply: info?.total_supply ?? null,
-      holders: info?.holder_count ?? null
+      name: raw?.result?.name || "Unknown",
+      symbol: raw?.result?.symbol || "???",
+      decimals: raw?.result?.decimals || null,
+      totalSupply: raw?.result?.totalSupply || null
     };
 
     return res.status(200).json(token);
 
   } catch (err) {
-    console.error("Arc proxy error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("Proxy error:", err);
+    return res.status(500).json({ error: "Internal proxy error" });
   }
 }
