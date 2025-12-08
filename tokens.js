@@ -1,4 +1,4 @@
-// TRUSTED TOKENS
+// TRUSTED TOKENS LIST
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
@@ -7,105 +7,161 @@ const TRUSTED_TOKENS = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("analyzeBtn").onclick = handleAnalyze;
-  document.getElementById("themeToggle").onclick = toggleTheme;
+  document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
+  document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 });
 
+// THEME SWITCH
 function toggleTheme() {
   document.body.classList.toggle("light");
+  document.body.classList.toggle("dark");
 }
 
+// MAIN ANALYSIS
 async function handleAnalyze() {
-  const addr = document.getElementById("tokenAddress").value.trim();
-  if (!addr || !addr.startsWith("0x")) return alert("Invalid address");
+  const address = document.getElementById("tokenAddress").value.trim();
 
-  const results = document.getElementById("results");
-  const riskCard = document.getElementById("riskCard");
-  const tokenCard = document.getElementById("tokenCard");
-
-  results.classList.remove("hidden");
-  riskCard.classList.add("hidden");
-  tokenCard.classList.add("hidden");
-
-  const resp = await fetch(`/api/arc-token?address=${addr}`);
-  const data = await resp.json();
-
-  if (!data || !data.name) {
-    document.getElementById("statusMsg").textContent = "Error loading token.";
+  if (!address.startsWith("0x") || address.length < 12) {
+    alert("Enter a valid ARC-20 address");
     return;
   }
 
-  fillTokenInfo(addr, data);
-  applyRisk(addr, data);
+  const riskCard = document.getElementById("riskCard");
+  const tokenCard = document.getElementById("tokenCard");
+  riskCard.classList.add("hidden");
+  tokenCard.classList.add("hidden");
 
-  tokenCard.classList.remove("hidden");
-  riskCard.classList.remove("hidden");
+  document.getElementById("statusMsg").textContent = "Loading token...";
+
+  try {
+    const url = `/api/arc-token?address=${address}`;
+    const res = await fetch(url);
+    const token = await res.json();
+
+    if (!token || !token.name) {
+      document.getElementById("statusMsg").textContent = "Error loading token.";
+      return;
+    }
+
+    fillToken(token, address);
+    evaluateRisk(token, address);
+
+    riskCard.classList.remove("hidden");
+    tokenCard.classList.remove("hidden");
+  } catch (err) {
+    console.error(err);
+    document.getElementById("statusMsg").textContent = "API error.";
+  }
 }
 
-function fillTokenInfo(address, token) {
+// FILL TOKEN CARD
+function fillToken(token, address) {
+  document.getElementById("tokenTitle").textContent = `${token.name} (${token.symbol})`;
+  document.getElementById("tokenAddressShort").textContent = shorten(address);
+  document.getElementById("tokenAvatar").textContent = token.symbol[0].toUpperCase();
+
   document.getElementById("tName").textContent = token.name;
   document.getElementById("tSymbol").textContent = token.symbol;
   document.getElementById("tDecimals").textContent = token.decimals;
   document.getElementById("tSupplyRaw").textContent = token.totalSupply;
-  document.getElementById("tSupplyHuman").textContent = token.totalSupply;
-
-  document.getElementById("tokenTitle").textContent = `${token.name} (${token.symbol})`;
-  document.getElementById("tokenAddressShort").textContent = address.substring(0, 6) + "..." + address.slice(-4);
-
-  document.getElementById("tokenAvatar").textContent =
-    (token.symbol?.[0] || token.name?.[0] || "?").toUpperCase();
+  document.getElementById("tSupplyHuman").textContent =
+    formatSupply(token.totalSupply, token.decimals);
 
   document.getElementById("statusMsg").textContent =
     "Token loaded successfully.";
 }
 
-function applyRisk(address, token) {
+// RISK EVALUATION (original layout)
+function evaluateRisk(token, address) {
   const pill = document.getElementById("riskPill");
-  const verified = document.getElementById("verifiedBadge");
-  const scoreText = document.getElementById("riskScoreText");
-  const list = document.getElementById("riskBreakdown");
+  const desc = document.getElementById("riskDescription");
+  const list = document.getElementById("riskList");
+  const breakdown = document.getElementById("riskBreakdown");
 
   list.innerHTML = "";
-  pill.className = "risk-pill risk-unknown";
-  verified.classList.add("hidden");
+  breakdown.classList.remove("hidden");
 
   let score = 0;
-  const checks = [];
+  const reasons = [];
 
-  const trusted = TRUSTED_TOKENS[address.toLowerCase()];
-  if (trusted) {
+  // Trusted?
+  if (TRUSTED_TOKENS[address.toLowerCase()]) {
     pill.textContent = "TRUSTED";
-    pill.classList.add("risk-safe");
-    verified.classList.remove("hidden");
-    scoreText.textContent = "Risk score: 0";
+    pill.className = "risk-pill risk-safe";
+    desc.textContent = "This token is marked as trusted.";
     return;
   }
 
-  // SIMPLE RISK SYSTEM
-  if (token.decimals === 0) { score += 2; checks.push("⚠️ Token has 0 decimals."); }
-  else checks.push("✅ Decimals look normal.");
-
-  if (token.totalSupply === "0") { score += 2; checks.push("⚠️ Total supply = 0."); }
-  else checks.push("ℹ️ Supply appears normal.");
-
-  checks.push("ℹ️ Address looks typical.");
-
-  // APPLY PILL
-  if (score === 0) {
-    pill.textContent = "LIKELY SAFE";
-    pill.classList.add("risk-safe");
-  } else if (score <= 2) {
-    pill.textContent = "CAUTION";
-    pill.classList.add("risk-warning");
+  // DECIMALS
+  if (token.decimals === 0 || token.decimals > 18) {
+    score += 2;
+    reasons.push("⚠️ Decimals unusual.");
   } else {
-    pill.textContent = "RISKY";
-    pill.classList.add("risk-danger");
+    reasons.push("✅ Decimals normal.");
   }
 
-  scoreText.textContent = `Risk score: ${score}`;
-  checks.forEach(c => {
+  // NAME/SYMBOL
+  if (!token.name || token.name.length < 3) {
+    score += 1;
+    reasons.push("⚠️ Name/symbol suspicious.");
+  } else {
+    reasons.push("✅ Name/symbol normal.");
+  }
+
+  // SUPPLY
+  const supply = BigInt(token.totalSupply || "0");
+  if (supply === 0n) {
+    score += 2;
+    reasons.push("⚠️ Total supply is zero.");
+  } else {
+    reasons.push("ℹ️ Supply appears normal.");
+  }
+
+  // ADDRESS PATTERN
+  if (address.toLowerCase().startsWith("0x000000")) {
+    score += 2;
+    reasons.push("⚠️ Suspicious address pattern.");
+  } else {
+    reasons.push("ℹ️ Address looks typical.");
+  }
+
+  // APPLY RISK BADGE
+  if (score === 0) {
+    pill.textContent = "LIKELY SAFE";
+    pill.className = "risk-pill risk-safe";
+    desc.textContent = "No red flags detected.";
+  } else if (score <= 2) {
+    pill.textContent = "CAUTION";
+    pill.className = "risk-pill risk-warning";
+    desc.textContent = "Some minor issues detected.";
+  } else if (score <= 4) {
+    pill.textContent = "RISKY";
+    pill.className = "risk-pill risk-warning";
+    desc.textContent = "Several red flags detected.";
+  } else {
+    pill.textContent = "HIGH RISK";
+    pill.className = "risk-pill risk-danger glow-danger";
+    desc.textContent = "Strong red flags — avoid interacting.";
+  }
+
+  reasons.forEach(r => {
     const li = document.createElement("li");
-    li.textContent = c;
+    li.textContent = r;
     list.appendChild(li);
   });
+}
+
+// HELPERS
+function shorten(addr) {
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
+}
+
+function formatSupply(raw, decimals) {
+  try {
+    const big = BigInt(raw);
+    const factor = BigInt(10) ** BigInt(decimals);
+    return (big / factor).toString();
+  } catch {
+    return raw;
+  }
 }
