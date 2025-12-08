@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Arc Token Inspector</title>
@@ -9,90 +9,95 @@
 <body>
   <div class="wrap">
     <header class="top">
-      <h1>Arc Token Inspector</h1>
+      <h1>ARC TOKEN INSPECTOR</h1>
       <p class="sub">
-        Explorer + Risk Analyzer para tokens da Arc (sem conectar carteira).
+        Explorer + Risk Analyzer for tokens on the Arc Testnet (no wallet connection required).
       </p>
     </header>
 
-    <!-- Busca de token específico -->
+    <!-- Search token by address -->
     <section class="panel search-panel">
-      <h2 class="panel-title">Analisar token por endereço</h2>
+      <h2 class="panel-title">Analyze Token by Address</h2>
       <p class="panel-sub">
-        Cole o endereço do contrato ERC-20 na Arc Testnet para ver detalhes e risco.
+        Paste the ERC-20 contract address on Arc Testnet to view details and risk score.
       </p>
+
       <div class="search-row">
         <input
           id="tokenSearch"
           type="text"
-          placeholder="0x... endereço do token"
+          placeholder="0x... token contract address"
         />
-        <button id="analyzeBtn" class="btn primary">Analisar</button>
+        <button id="analyzeBtn" class="btn primary">Analyze</button>
       </div>
+
       <div id="searchError" class="error-msg hidden"></div>
       <div id="searchResult" class="token-card hidden"></div>
     </section>
 
-    <!-- Lista de tokens populares / detectados -->
+    <!-- Token list -->
     <section class="panel list-panel">
       <div class="list-header">
         <div>
-          <h2 class="panel-title">Tokens na Arc</h2>
+          <h2 class="panel-title">Tokens on Arc</h2>
           <p class="panel-sub">
-            Lista de tokens detectados via ArcScan / Blockscout. Selecione um para ver risco.
+            List of tokens detected via ArcScan / Blockscout. Select one to view its risk rating.
           </p>
         </div>
+
         <div class="filters">
-          <button class="chip active" data-filter="all">Todos</button>
-          <button class="chip" data-filter="trusted">Confiáveis</button>
-          <button class="chip" data-filter="unknown">Desconhecido</button>
-          <button class="chip" data-filter="danger">Não seguro</button>
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="trusted">Trusted</button>
+          <button class="chip" data-filter="unknown">Unknown</button>
+          <button class="chip" data-filter="danger">Not Safe</button>
         </div>
       </div>
 
       <div id="tokensTableWrapper" class="table-wrapper">
-        <div id="tokensLoading" class="info-msg">Carregando tokens da Arc...</div>
+        <div id="tokensLoading" class="info-msg">Loading tokens from Arc...</div>
+
         <table id="tokensTable" class="token-table hidden">
           <thead>
             <tr>
               <th>Token</th>
-              <th>Endereço</th>
+              <th>Address</th>
               <th>Holders</th>
               <th>Status</th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="tokensTbody">
-          </tbody>
+
+          <tbody id="tokensTbody"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Legenda / explicação de risco -->
+    <!-- Risk criteria -->
     <section class="panel legend-panel">
-      <h2 class="panel-title">Como o status de risco é calculado?</h2>
+      <h2 class="panel-title">How is the risk score calculated?</h2>
+
       <ul class="legend-list">
         <li>
-          <span class="badge status-trusted">Confiável</span>
-          Contrato verificado, vários holders, algum tempo de vida, sem funções óbvias de abuso.
+          <span class="badge status-trusted">Trusted</span>
+          Verified contract, multiple holders, some time online, no abusive functions.
         </li>
         <li>
-          <span class="badge status-unknown">Desconhecido</span>
-          Novo, poucos holders ou pouco uso. Não necessariamente malicioso, mas exige cautela.
+          <span class="badge status-unknown">Unknown</span>
+          New token, few holders or little usage. Not necessarily malicious, but caution is recommended.
         </li>
         <li>
-          <span class="badge status-danger">Não seguro</span>
-          Contrato não verificado, funções sensíveis (mint ilimitado, blacklist, pause) ou padrões suspeitos.
+          <span class="badge status-danger">Not Safe</span>
+          Unverified contract, sensitive functions (unlimited mint, blacklist, pause), or suspicious patterns.
         </li>
       </ul>
+
       <p class="panel-sub">
-        Este dApp é apenas um <strong>indicador educativo</strong>. Sempre faça sua própria pesquisa
-        antes de interagir com qualquer token.
+        This dApp is an <strong>educational risk indicator</strong>. Always DYOR before interacting with any token.
       </p>
     </section>
 
     <footer class="foot">
-      Construído por João Carlos • Arc Community • Sem conexão de carteira 🔒
+      Built by João Carlos • Arc Community • No wallet connection required 🔒
     </footer>
   </div>
 
