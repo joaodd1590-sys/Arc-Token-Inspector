@@ -1,44 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ARC Token Inspector</title>
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARC Token Inspector</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-    <div class="container">
+  <div class="app-shell">
+    <header class="app-header">
+      <h1>ARC Token Inspector</h1>
+      <p class="subtitle">
+        Simple on-chain token overview &amp; heuristic risk signal — no wallet connection required.
+      </p>
+    </header>
 
-        <h1 class="title">ARC Token Inspector</h1>
-        <p class="subtitle">Simple on-chain token overview & heuristic risk signal — no wallet connection required.</p>
+    <section class="analyze-section">
+      <div class="input-wrapper">
+        <input
+          id="tokenAddress"
+          type="text"
+          placeholder="Paste an ARC-20 contract address (0x...)"
+        />
+        <button id="analyzeBtn">Analyze</button>
+      </div>
+      <p class="input-tip">
+        Tip: start with the official USDC on ARC Testnet:
+        <span class="mono">0x3600000000000000000000000000000000000000</span>
+      </p>
+    </section>
 
-        <div class="input-box">
-            <input id="tokenAddress" type="text" placeholder="Paste an ARC-20 contract address (0x...)">
-            <button onclick="analyzeToken()">Analyze</button>
+    <main class="cards-grid">
+      <!-- Risk / status card -->
+      <section id="riskCard" class="card risk-card hidden">
+        <div class="risk-header">
+          <span id="riskPill" class="risk-pill risk-unknown">Unknown</span>
+          <span id="verifiedBadge" class="verified-badge hidden">Verified token</span>
         </div>
-
-        <p class="tip">Tip: start with the official USDC on ARC Testnet: 
-            <span class="example">0x3600000000000000000000000000000000000000</span>
+        <h2>Risk &amp; Reliability</h2>
+        <p id="riskTitle" class="risk-title">No token loaded yet.</p>
+        <p id="riskDescription" class="risk-description">
+          Paste a token address and click Analyze to see a heuristic risk signal.
         </p>
+        <ul class="risk-notes">
+          <li>Heuristic only — always double-check the contract yourself.</li>
+          <li>No private APIs, only public on-chain data &amp; basic rules.</li>
+        </ul>
+      </section>
 
-        <div id="statusBox" class="status-hidden"></div>
-
-        <div class="card" id="tokenCard">
-            <h2>Token Information</h2>
-            <p><strong>Name:</strong> <span id="tName">-</span></p>
-            <p><strong>Symbol:</strong> <span id="tSymbol">-</span></p>
-            <p><strong>Decimals:</strong> <span id="tDecimals">-</span></p>
-            <p><strong>Total Supply:</strong> <span id="tSupply">-</span></p>
-            <p class="loaded" id="loadedMsg"></p>
+      <!-- Token info card -->
+      <section id="tokenCard" class="card token-card hidden">
+        <div class="token-header">
+          <div class="token-avatar" id="tokenAvatar">?</div>
+          <div>
+            <h2 id="tokenTitle">Token Information</h2>
+            <p id="tokenAddressShort" class="token-address-short mono"></p>
+          </div>
         </div>
 
-        <footer>
-            Built by João Carlos · ARC ecosystem community tool · Educational only — never rely on a single signal when interacting with tokens.
-        </footer>
+        <div class="token-fields">
+          <div class="field-row">
+            <span class="field-label">Name</span>
+            <span id="tName" class="field-value">-</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Symbol</span>
+            <span id="tSymbol" class="field-value">-</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Decimals</span>
+            <span id="tDecimals" class="field-value">-</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Raw Total Supply</span>
+            <span id="tSupplyRaw" class="field-value mono">-</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Human Total Supply</span>
+            <span id="tSupplyHuman" class="field-value mono">-</span>
+          </div>
+        </div>
 
-    </div>
+        <p id="statusMsg" class="status-msg"></p>
+      </section>
+    </main>
 
-    <script src="tokens.js"></script>
+    <footer class="app-footer">
+      <p>
+        Built by João Carlos · ARC ecosystem community tool · Educational only —
+        never rely on a single signal when interacting with tokens.
+      </p>
+    </footer>
+  </div>
+
+  <script src="tokens.js"></script>
 </body>
 </html>
