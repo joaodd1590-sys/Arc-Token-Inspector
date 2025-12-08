@@ -1,8 +1,8 @@
 // =======================================================
-//  Arc Token Inspector – Stable Version + Real Analyze
+//  Arc Token Inspector – Real Analyze (Solution A)
 // =======================================================
 
-// Mock token list for Arc Testnet (table only)
+// Mock table tokens
 const TOKENS = [
   {
     id: "usdc-test",
@@ -11,7 +11,7 @@ const TOKENS = [
     address: "0xMockUSDC00000000000000000000000000000001",
     holders: 420,
     status: "trusted",
-    notes: "Circle-style test USDC on Arc Testnet. Used for most gas & fee examples."
+    notes: "Circle-style test USDC on Arc Testnet."
   },
   {
     id: "memearc",
@@ -20,8 +20,7 @@ const TOKENS = [
     address: "0xMockMARC0000000000000000000000000000002",
     holders: 7,
     status: "unknown",
-    notes:
-      "Low holder count and short history. Could be harmless, could be a rug – do your own research."
+    notes: "Low holder count and short history."
   },
   {
     id: "superyield",
@@ -30,8 +29,7 @@ const TOKENS = [
     address: "0xMockSYLD0000000000000000000000000000003",
     holders: 1,
     status: "risky",
-    notes:
-      "Contract not verified and contains functions that may allow draining or freezing balances."
+    notes: "Contract includes suspicious functions."
   }
 ];
 
@@ -55,7 +53,7 @@ const toastEl = document.getElementById("toast");
 let currentFilter = "all";
 
 // =======================================================
-//  RISK ENGINE
+// RISK ENGINE
 // =======================================================
 
 function classifyRiskSimple(h) {
@@ -71,8 +69,7 @@ function classifyRiskSimple(h) {
 }
 
 // =======================================================
-//  FETCH REAL TOKEN DATA FROM ARCSCAN
-//  (downloads full list once per analyze)
+// FETCH REAL TOKEN DATA (API v1 + API v2 COMBINED)
 // =======================================================
 
 async function fetchRealToken(address) {
@@ -82,31 +79,37 @@ async function fetchRealToken(address) {
   let totalSupply = "?";
   let holders = "Unknown";
 
+  // STEP 1 — API v1 (basic info)
   try {
-    // DOWNLOADING REAL TOKEN LIST FROM ARC
-    const url = `https://testnet.arcscan.app/api/v2/tokens?type=ERC-20&items_count=500`;
-    const res = await fetch(url);
-    const json = await res.json();
+    const r1 = await fetch(
+      `https://testnet.arcscan.app/api?module=token&action=getToken&contractaddress=${address}`
+    );
+    const j1 = await r1.json();
 
-    // FIND TOKEN BY ADDRESS
-    if (json?.items?.length > 0) {
-      const token = json.items.find(
-        (t) => t.address.toLowerCase() === address.toLowerCase()
-      );
-
-      if (token) {
-        name = token.name ?? name;
-        symbol = token.symbol ?? symbol;
-        decimals = token.decimals ?? decimals;
-        totalSupply = token.total_supply ?? totalSupply;
-        holders = token.holders ?? holders;
-      }
+    if (j1?.result) {
+      name = j1.result.name ?? name;
+      symbol = j1.result.symbol ?? symbol;
+      decimals = j1.result.decimals ?? decimals;
+      totalSupply = j1.result.totalSupply ?? totalSupply;
     }
   } catch (err) {
-    console.log("Error fetching ARCScan real token list:", err);
+    console.log("API v1 error:", err);
   }
 
-  // Risk evaluation
+  // STEP 2 — API v2 (holders)
+  try {
+    const r2 = await fetch(
+      `https://testnet.arcscan.app/api/v2/tokens/${address}/holders?items_count=10000`
+    );
+    const j2 = await r2.json();
+
+    if (j2?.count !== undefined) {
+      holders = j2.count;
+    }
+  } catch (err) {
+    console.log("API v2 error:", err);
+  }
+
   const risk = classifyRiskSimple(holders);
 
   return {
@@ -122,7 +125,7 @@ async function fetchRealToken(address) {
 }
 
 // =======================================================
-//  HELPER FUNCTIONS
+// HELPERS
 // =======================================================
 
 function findTokenByAddress(address) {
@@ -136,7 +139,7 @@ function shortAddr(addr) {
 }
 
 // =======================================================
-//  RENDER ANALYSIS PANEL
+// RENDER ANALYSIS PANEL
 // =======================================================
 
 function showAnalyzeResult(token) {
@@ -161,7 +164,7 @@ function showAnalyzeResult(token) {
 }
 
 // =======================================================
-//  HANDLE ANALYZE BUTTON
+// ANALYZE FORM HANDLER
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
@@ -176,7 +179,6 @@ analyzeForm.addEventListener("submit", async (e) => {
 
   showToast("Fetching token...");
 
-  // Try mock list
   const mockToken = findTokenByAddress(address);
   if (mockToken) {
     showAnalyzeResult(mockToken);
@@ -184,7 +186,6 @@ analyzeForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Fetch REAL on-chain token
   const realToken = await fetchRealToken(address);
   showAnalyzeResult(realToken);
   smoothScrollTo(analyzeResultCard);
@@ -196,7 +197,7 @@ copyAnalyzeAddressBtn.addEventListener("click", () => {
 });
 
 // =======================================================
-//  TABLE RENDERING (MOCK ONLY)
+// TABLE RENDERING (MOCK)
 // =======================================================
 
 function createStatusPill(status) {
@@ -270,7 +271,7 @@ filterButtons.forEach((btn) => {
 });
 
 // =======================================================
-//  UTILITIES
+// UTILITIES
 // =======================================================
 
 function showToast(message) {
@@ -299,7 +300,7 @@ function smoothScrollTo(elem) {
 }
 
 // =======================================================
-//  INIT
+// INIT
 // =======================================================
 
 renderTable();
