@@ -2,20 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
   <title>ARC Token Inspector</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body data-theme="dark">
   <div class="app-shell">
     <header class="app-header">
-      <h1>ARC Token Inspector</h1>
-      <p class="subtitle">
-        Simple on-chain token overview &amp; heuristic risk signal — no wallet connection required.
-      </p>
+      <div class="top-bar">
+        <div class="top-left">
+          <h1>ARC Token Inspector</h1>
+          <p class="subtitle">
+            Token overview & heuristic security signal — no wallet connection required.
+          </p>
+        </div>
+        <div class="top-right">
+          <div class="network-select-wrapper">
+            <label for="networkSelect">Network</label>
+            <select id="networkSelect">
+              <option value="arcTestnet" selected>ARC Testnet</option>
+              <option value="arcMainnet">ARC Mainnet (soon)</option>
+            </select>
+          </div>
+          <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+            🌙
+          </button>
+        </div>
+      </div>
     </header>
 
-    <section class="analyze-section">
+    <section class="analyze-section card-animated">
       <div class="input-wrapper">
         <input
           id="tokenAddress"
@@ -25,7 +44,7 @@
         <button id="analyzeBtn">Analyze</button>
       </div>
       <p class="input-tip">
-        Tip: start with the official USDC on ARC Testnet:
+        Tip: try the official USDC on ARC Testnet:
         <span class="mono">0x3600000000000000000000000000000000000000</span>
       </p>
     </section>
@@ -44,7 +63,7 @@
         </p>
         <ul class="risk-notes">
           <li>Heuristic only — always double-check the contract yourself.</li>
-          <li>No private APIs, only public on-chain data &amp; basic rules.</li>
+          <li>Some deep checks (ABI, honeypot, creation date) are limited on testnet.</li>
         </ul>
       </section>
 
@@ -52,9 +71,23 @@
       <section id="tokenCard" class="card token-card hidden">
         <div class="token-header">
           <div class="token-avatar" id="tokenAvatar">?</div>
-          <div>
+          <div class="token-header-main">
             <h2 id="tokenTitle">Token Information</h2>
-            <p id="tokenAddressShort" class="token-address-short mono"></p>
+            <div class="token-address-row">
+              <p id="tokenAddressShort" class="token-address-short mono"></p>
+              <button id="copyAddressBtn" class="copy-btn" type="button">
+                📋 Copy
+              </button>
+            </div>
+            <a
+              id="explorerLink"
+              class="explorer-link"
+              href="#"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on explorer ↗
+            </a>
           </div>
         </div>
 
@@ -85,6 +118,37 @@
       </section>
     </main>
 
+    <!-- Charts + Breakdown -->
+    <section id="chartsSection" class="card charts-section hidden">
+      <h2>Risk analysis &amp; breakdown</h2>
+      <p class="charts-hint">
+        These charts are based on heuristic checks (decimals, supply, name/symbol, address pattern, impersonation, etc.).
+      </p>
+
+      <div class="charts-grid">
+        <div class="chart-block">
+          <h3>Overall risk level</h3>
+          <canvas id="riskPieChart"></canvas>
+        </div>
+        <div class="chart-block">
+          <h3>Risk factors weight</h3>
+          <canvas id="riskBarChart"></canvas>
+        </div>
+        <div class="chart-block">
+          <h3>Score build-up</h3>
+          <canvas id="riskLineChart"></canvas>
+        </div>
+        <div class="chart-block">
+          <h3>Supply comparison (USDC ref)</h3>
+          <canvas id="supplyBarChart"></canvas>
+        </div>
+      </div>
+
+      <div id="riskBreakdown" class="risk-breakdown">
+        <!-- filled via JS -->
+      </div>
+    </section>
+
     <footer class="app-footer">
       <p>
         Built by João Carlos · ARC ecosystem community tool · Educational only —
@@ -93,6 +157,8 @@
     </footer>
   </div>
 
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="tokens.js"></script>
 </body>
 </html>
