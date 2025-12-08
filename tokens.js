@@ -2,7 +2,7 @@
 //  Arc Token Inspector – Stable Version + Real Analyze
 // =======================================================
 
-// Mock token list for Arc Testnet
+// Mock token list for Arc Testnet (table only)
 const TOKENS = [
   {
     id: "usdc-test",
@@ -71,7 +71,8 @@ function classifyRiskSimple(h) {
 }
 
 // =======================================================
-//  FETCH REAL TOKEN DATA FROM ARCScan (working endpoint)
+//  FETCH REAL TOKEN DATA FROM ARCSCAN
+//  (downloads full list once per analyze)
 // =======================================================
 
 async function fetchRealToken(address) {
@@ -82,23 +83,30 @@ async function fetchRealToken(address) {
   let holders = "Unknown";
 
   try {
-    const url = `https://testnet.arcscan.app/api/v2/tokens?search=${address}`;
+    // DOWNLOADING REAL TOKEN LIST FROM ARC
+    const url = `https://testnet.arcscan.app/api/v2/tokens?type=ERC-20&items_count=500`;
     const res = await fetch(url);
     const json = await res.json();
 
+    // FIND TOKEN BY ADDRESS
     if (json?.items?.length > 0) {
-      const t = json.items[0];
+      const token = json.items.find(
+        (t) => t.address.toLowerCase() === address.toLowerCase()
+      );
 
-      name = t.name ?? name;
-      symbol = t.symbol ?? symbol;
-      decimals = t.decimals ?? decimals;
-      totalSupply = t.total_supply ?? totalSupply;
-      holders = t.holders ?? holders;
+      if (token) {
+        name = token.name ?? name;
+        symbol = token.symbol ?? symbol;
+        decimals = token.decimals ?? decimals;
+        totalSupply = token.total_supply ?? totalSupply;
+        holders = token.holders ?? holders;
+      }
     }
   } catch (err) {
-    console.log("Internal ARCScan token API error:", err);
+    console.log("Error fetching ARCScan real token list:", err);
   }
 
+  // Risk evaluation
   const risk = classifyRiskSimple(holders);
 
   return {
@@ -153,7 +161,7 @@ function showAnalyzeResult(token) {
 }
 
 // =======================================================
-//  HANDLE ANALYZE BUTTON (REAL + MOCK)
+//  HANDLE ANALYZE BUTTON
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
@@ -168,7 +176,7 @@ analyzeForm.addEventListener("submit", async (e) => {
 
   showToast("Fetching token...");
 
-  // 1: Try mock list first
+  // Try mock list
   const mockToken = findTokenByAddress(address);
   if (mockToken) {
     showAnalyzeResult(mockToken);
@@ -176,7 +184,7 @@ analyzeForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  // 2: Fetch real ARCScan data
+  // Fetch REAL on-chain token
   const realToken = await fetchRealToken(address);
   showAnalyzeResult(realToken);
   smoothScrollTo(analyzeResultCard);
