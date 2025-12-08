@@ -1,6 +1,11 @@
 // =======================================================
-//  Arc Token Inspector – LIVE VERSION (ArcScan API)
-//  Fully Fixed for new API format
+//  Arc Token Inspector – COMPLETE LIVE VERSION
+//  Using ARC Testnet Blockscout API v2 + v1 hybrid mode
+// -------------------------------------------------------
+//  - Tabela real com token list da API v2
+//  - Painel de análise usando getToken (API v1)
+//  - Risk engine simples baseado em holders
+//  - Paginação automática (carrega todos os tokens reais)
 // =======================================================
 
 // DOM refs
@@ -24,35 +29,32 @@ let currentFilter = "all";
 let LIVE_TOKENS = [];
 
 // =======================================================
-//  FETCH TOKEN INFO (SINGLE TOKEN)
+//  API v1 – GET TOKEN INFO (análise individual)
 // =======================================================
 
 async function fetchTokenInfo(address) {
   const base = "https://testnet.arcscan.app/api";
 
   try {
-    const metaRes = await fetch(
+    const res = await fetch(
       `${base}?module=token&action=getToken&contractaddress=${address}`
     );
-    const metaJson = await metaRes.json();
+    const json = await res.json();
 
-    if (!metaJson?.result) return null;
+    if (!json?.result) return null;
 
-    const token = metaJson.result;
+    const t = json.result;
 
-    // API nova NÃO fornece holders → "Unknown"
-    const holders = token.holders ?? "Unknown";
-
-    // Risco simplificado (não existe mais "verified")
+    const holders = t.holders ?? "Unknown";
     const risk = classifyRiskSimple(holders);
 
     return {
-      name: token.name || "Unknown",
-      symbol: token.symbol || "???",
-      address: token.contractAddress || address,
+      name: t.name || "Unknown",
+      symbol: t.symbol || "???",
+      address: t.contractAddress || address,
       holders,
-      decimals: token.decimals ?? "?",
-      totalSupply: token.totalSupply ?? "?",
+      decimals: t.decimals ?? "?",
+      totalSupply: t.totalSupply ?? "?",
       status: risk.status,
       notes: risk.notes
     };
@@ -63,33 +65,45 @@ async function fetchTokenInfo(address) {
 }
 
 // =======================================================
-//  FETCH ALL TOKENS (LISTA REAL)
+//  API v2 – TOKEN LIST REAL (com paginação)
+//  https://testnet.arcscan.app/api/v2/tokens
 // =======================================================
 
 async function fetchTokenList() {
-  const base = "https://testnet.arcscan.app/api";
+  const base = "https://testnet.arcscan.app/api/v2/tokens";
+  let all = [];
+  let next = null;
 
   try {
-    const res = await fetch(`${base}?module=token&action=tokenlist`);
-    const json = await res.json();
+    while (true) {
+      const url = next ? `${base}?${next}` : base;
+      const res = await fetch(url);
+      const json = await res.json();
 
-    if (!json?.result || !Array.isArray(json.result)) return [];
+      if (!json?.items) break;
 
-    return json.result.map((t) => {
-      const holders = t.holders ?? "Unknown";
-      const risk = classifyRiskSimple(holders);
+      json.items.forEach((t) => {
+        const holders = t.holders ?? "Unknown";
+        const risk = classifyRiskSimple(holders);
 
-      return {
-        name: t.name || "Unknown",
-        symbol: t.symbol || "???",
-        address: t.contractAddress,
-        holders,
-        decimals: t.decimals ?? "?",
-        totalSupply: t.totalSupply ?? "?",
-        status: risk.status,
-        notes: risk.notes
-      };
-    });
+        all.push({
+          name: t.name || "Unknown",
+          symbol: t.symbol || "???",
+          address: t.address,
+          holders: t.holders ?? "Unknown",
+          decimals: t.decimals,
+          totalSupply: t.total_supply,
+          status: risk.status,
+          notes: risk.notes
+        });
+      });
+
+      if (!json.next_page_params) break;
+
+      next = new URLSearchParams(json.next_page_params).toString();
+    }
+
+    return all;
   } catch (err) {
     console.error("ERROR fetchTokenList:", err);
     return [];
@@ -97,7 +111,7 @@ async function fetchTokenList() {
 }
 
 // =======================================================
-//  SIMPLE RISK ENGINE (NO VERIFIED FIELD)
+//  SIMPLE RISK ENGINE
 // =======================================================
 
 function classifyRiskSimple(holders) {
@@ -124,7 +138,7 @@ function classifyRiskSimple(holders) {
 }
 
 // =======================================================
-//  ANALYSIS RESULT CARD
+//  SHOW ANALYSIS PANEL
 // =======================================================
 
 function showAnalyzeResult(token) {
@@ -151,23 +165,22 @@ function showAnalyzeResult(token) {
 }
 
 // =======================================================
-//  FORM SUBMIT – ANALYZE TOKEN BY ADDRESS
+//  FORM SUBMIT (analisar endereço)
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const value = addressInput.value.trim();
+  const addr = addressInput.value.trim();
 
-  if (!value.startsWith("0x") || value.length < 20) {
+  if (!addr.startsWith("0x") || addr.length < 20) {
     showToast("Please enter a valid contract address.");
     return;
   }
 
-  showToast("Fetching data...");
+  showToast("Fetching token data...");
 
-  const token = await fetchTokenInfo(value);
-
+  const token = await fetchTokenInfo(addr);
   if (!token) {
     showToast("Token not found.");
     return;
@@ -178,7 +191,7 @@ analyzeForm.addEventListener("submit", async (e) => {
 });
 
 // =======================================================
-//  TABLE RENDERING – REAL DATA
+//  TABLE RENDERING (real token list)
 // =======================================================
 
 function shortAddr(addr) {
@@ -225,26 +238,21 @@ function renderTable() {
   filtered.forEach((token) => {
     const tr = document.createElement("tr");
 
-    // Token name + symbol
     const tdToken = document.createElement("td");
     tdToken.innerHTML = `
       <span class="token-name">${token.name}</span>
       <span class="token-symbol">${token.symbol}</span>
     `;
 
-    // Address
     const tdAddress = document.createElement("td");
     tdAddress.innerHTML = `<span class="token-address">${shortAddr(token.address)}</span>`;
 
-    // Holders
     const tdHolders = document.createElement("td");
     tdHolders.textContent = token.holders;
 
-    // Status
     const tdStatus = document.createElement("td");
     tdStatus.appendChild(createStatusPill(token.status));
 
-    // Actions
     const tdActions = document.createElement("td");
     tdActions.className = "col-actions";
 
@@ -259,7 +267,8 @@ function renderTable() {
     const copyBtn = document.createElement("button");
     copyBtn.className = "btn-ghost btn-copy";
     copyBtn.textContent = "Copy";
-    copyBtn.onclick = () => copyToClipboard(token.address, "Address copied");
+    copyBtn.onclick = () =>
+      copyToClipboard(token.address, "Address copied");
 
     tdActions.appendChild(viewBtn);
     tdActions.appendChild(copyBtn);
@@ -311,8 +320,8 @@ function copyToClipboard(text, msg) {
 
 function smoothScrollTo(elem) {
   const rect = elem.getBoundingClientRect();
-  const absoluteTop = window.scrollY + rect.top - 80;
-  window.scrollTo({ top: absoluteTop, behavior: "smooth" });
+  const absTop = window.scrollY + rect.top - 80;
+  window.scrollTo({ top: absTop, behavior: "smooth" });
 }
 
 // =======================================================
