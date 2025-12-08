@@ -1,6 +1,40 @@
 // =======================================================
-// ARC TOKEN INSPECTOR – REAL FINAL VERSION (API VALIDATED)
+//  Arc Token Inspector – Frontend Logic
 // =======================================================
+
+// Mock token list for Arc Testnet.
+// In the future you can swap this for live data from ArcScan / Blockscout.
+const TOKENS = [
+  {
+    id: "usdc-test",
+    name: "USD Coin (Test)",
+    symbol: "USDC",
+    address: "0xMockUSDC00000000000000000000000000000001",
+    holders: 420,
+    status: "trusted",
+    notes: "Circle-style test USDC on Arc Testnet. Used for most gas & fee examples."
+  },
+  {
+    id: "memearc",
+    name: "MemeArc",
+    symbol: "MARC",
+    address: "0xMockMARC0000000000000000000000000000002",
+    holders: 7,
+    status: "unknown",
+    notes:
+      "Low holder count and short history. Could be harmless, could be a rug – do your own research."
+  },
+  {
+    id: "superyield",
+    name: "SuperYield 1000x",
+    symbol: "SYLD",
+    address: "0xMockSYLD0000000000000000000000000000003",
+    holders: 1,
+    status: "risky",
+    notes:
+      "Contract not verified and contains functions that may allow draining or freezing balances."
+  }
+];
 
 // DOM refs
 const tableBody = document.getElementById("tokenTableBody");
@@ -15,177 +49,251 @@ const analyzeAddressEl = document.getElementById("analyzeAddress");
 const analyzeHoldersEl = document.getElementById("analyzeHolders");
 const analyzeNotesEl = document.getElementById("analyzeNotes");
 const analyzeHint = document.getElementById("analyzeEmptyHint");
+const copyAnalyzeAddressBtn = document.getElementById("copyAnalyzeAddress");
 
 const toastEl = document.getElementById("toast");
 
-let LIVE_TOKENS = [];
 let currentFilter = "all";
 
 // =======================================================
-//  RISK ENGINE
+//  Rendering
 // =======================================================
+function createStatusPill(status) {
+  const span = document.createElement("span");
+  span.classList.add("status-pill");
 
-function classifyRisk(holders) {
-  const h = Number(holders);
-  if (h > 50) return { status: "trusted", notes: "Healthy number of holders." };
-  if (h <= 3) return { status: "risky", notes: "Very low holder count." };
-  return { status: "unknown", notes: "Unverified token — proceed with caution." };
-}
-
-// =======================================================
-// FETCH TOKEN INFO (REAL API PATHS)
-// =======================================================
-
-async function fetchTokenInfo(address) {
-  const base = "https://testnet.arcscan.app/api";
-
-  let name = "Unknown";
-  let symbol = "???";
-  let decimals = "?";
-  let totalSupply = "?";
-  let holders = "Unknown";
-
-  // STEP 1 — GET NAME + SYMBOL (API v1)
-  try {
-    const r1 = await fetch(`${base}?module=token&action=getToken&contractaddress=${address}`);
-    const j1 = await r1.json();
-
-    if (j1?.result) {
-      name = j1.result.name ?? name;
-      symbol = j1.result.symbol ?? symbol;
-      decimals = j1.result.decimals ?? decimals;
-      totalSupply = j1.result.totalSupply ?? totalSupply;
-    }
-  } catch (err) {}
-
-  // STEP 2 — GET HOLDERS (API v2 VALID!)
-  try {
-    const r2 = await fetch(`https://testnet.arcscan.app/api/v2/tokens/${address}/holders`);
-    const j2 = await r2.json();
-
-    if (j2?.count !== undefined) {
-      holders = j2.count;
-    }
-  } catch (err) {}
-
-  const risk = classifyRisk(holders);
-
-  return {
-    name,
-    symbol,
-    address,
-    decimals,
-    totalSupply,
-    holders,
-    status: risk.status,
-    notes: risk.notes,
-  };
-}
-
-// =======================================================
-// FETCH TOKEN LIST (REAL ENDPOINT)
-// =======================================================
-
-async function fetchTokenList() {
-  try {
-    const res = await fetch("https://testnet.arcscan.app/api/v2/tokens");
-    const json = await res.json();
-
-    if (!json.items) return [];
-
-    return json.items.map((t) => {
-      const risk = classifyRisk(t.holders ?? "Unknown");
-      return {
-        name: t.name,
-        symbol: t.symbol,
-        address: t.address,
-        holders: t.holders,
-        status: risk.status,
-        notes: risk.notes,
-      };
-    });
-  } catch (err) {
-    console.log("Error loading list");
-    return [];
-  }
-}
-
-// =======================================================
-// PANEL RENDER
-// =======================================================
-
-function showAnalyzeResult(t) {
-  analyzeHint.classList.add("hidden");
-  analyzeResultCard.classList.remove("hidden");
-
-  analyzeNameEl.textContent = `${t.name} (${t.symbol})`;
-
-  analyzeStatusEl.className = "status-pill";
-  analyzeStatusEl.classList.add(
-    t.status === "trusted" ? "status-trusted" :
-    t.status === "risky" ? "status-risky" :
-    "status-unknown"
-  );
-  analyzeStatusEl.textContent = t.status;
-
-  analyzeAddressEl.textContent = t.address;
-  analyzeHoldersEl.textContent = t.holders;
-  analyzeNotesEl.textContent = t.notes;
-}
-
-// =======================================================
-// FORM SUBMIT
-// =======================================================
-
-analyzeForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const addr = addressInput.value.trim();
-
-  if (!addr.startsWith("0x") || addr.length !== 42) {
-    showToast("Invalid address.");
-    return;
+  if (status === "trusted") {
+    span.classList.add("status-trusted");
+    span.textContent = "Trusted";
+  } else if (status === "risky") {
+    span.classList.add("status-risky");
+    span.textContent = "Risky";
+  } else {
+    span.classList.add("status-unknown");
+    span.textContent = "Unknown";
   }
 
-  showToast("Fetching...");
-  const data = await fetchTokenInfo(addr);
-  showAnalyzeResult(data);
-});
-
-// =======================================================
-// TABLE RENDER
-// =======================================================
+  return span;
+}
 
 function renderTable() {
   tableBody.innerHTML = "";
 
-  const filtered = LIVE_TOKENS.filter((t) =>
+  const tokens = TOKENS.filter((t) =>
     currentFilter === "all" ? true : t.status === currentFilter
   );
 
-  filtered.forEach((t) => {
+  tokens.forEach((token) => {
     const tr = document.createElement("tr");
 
-    tr.innerHTML = `
-      <td><span>${t.name}</span> <small>${t.symbol}</small></td>
-      <td>${t.address}</td>
-      <td>${t.holders}</td>
-      <td>${t.status}</td>
-      <td>
-        <button class="btn-ghost" onclick="showAnalyzeResult(${JSON.stringify(t)})">View</button>
-      </td>
-    `;
+    // Token col
+    const tdToken = document.createElement("td");
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "token-name";
+    nameSpan.textContent = token.name;
+
+    const symbolSpan = document.createElement("span");
+    symbolSpan.className = "token-symbol";
+    symbolSpan.textContent = token.symbol;
+
+    tdToken.appendChild(nameSpan);
+    tdToken.appendChild(symbolSpan);
+
+    // Address col
+    const tdAddress = document.createElement("td");
+    const addrSpan = document.createElement("span");
+    addrSpan.className = "token-address";
+    addrSpan.textContent = shortAddr(token.address);
+    tdAddress.appendChild(addrSpan);
+
+    // Holders col
+    const tdHolders = document.createElement("td");
+    tdHolders.textContent = token.holders.toString();
+
+    // Status col
+    const tdStatus = document.createElement("td");
+    tdStatus.appendChild(createStatusPill(token.status));
+
+    // Actions col
+    const tdActions = document.createElement("td");
+    tdActions.className = "col-actions";
+
+    const viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "btn-ghost";
+    viewBtn.textContent = "View";
+    viewBtn.addEventListener("click", () => {
+      showAnalyzeResult(token);
+      smoothScrollTo(analyzeResultCard);
+    });
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "btn-ghost btn-copy";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => {
+      copyToClipboard(token.address, "Token address copied");
+    });
+
+    tdActions.appendChild(viewBtn);
+    tdActions.appendChild(copyBtn);
+
+    tr.appendChild(tdToken);
+    tr.appendChild(tdAddress);
+    tr.appendChild(tdHolders);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
 
     tableBody.appendChild(tr);
   });
+
+  if (tokens.length === 0) {
+    const trEmpty = document.createElement("tr");
+    const tdEmpty = document.createElement("td");
+    tdEmpty.colSpan = 5;
+    tdEmpty.textContent = "No tokens for this filter.";
+    tdEmpty.style.color = "var(--text-muted)";
+    tdEmpty.style.padding = "14px 10px";
+    trEmpty.appendChild(tdEmpty);
+    tableBody.appendChild(trEmpty);
+  }
+}
+
+// helper for shortening addresses
+function shortAddr(addr) {
+  if (!addr || addr.length < 10) return addr || "--";
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
 // =======================================================
-// INIT
+//  Analyze by address
 // =======================================================
 
-(async function init() {
-  showToast("Loading tokens...");
-  LIVE_TOKENS = await fetchTokenList();
-  renderTable();
-})();
+function findTokenByAddress(address) {
+  if (!address) return null;
+  const normalized = address.trim().toLowerCase();
+  return TOKENS.find((t) => t.address.toLowerCase() === normalized) || null;
+}
+
+// Basic mock classification for addresses not in TOKENS
+function classifyUnknownAddress(address) {
+  // very naive heuristics for the demo:
+  // if address ends with many zeros -> risky (could be proxy or weird)
+  const lastFour = address.slice(-4);
+  let status = "unknown";
+  let holders = "?";
+  let notes =
+    "This contract is not in the curated list. No risk data is available – treat as unknown.";
+
+  if (/^0{3,4}$/g.test(lastFour)) {
+    status = "risky";
+    notes =
+      "The address pattern looks unusual and this contract is not in the curated list. Treat as risky.";
+  }
+
+  return { status, holders, notes };
+}
+
+function showAnalyzeResult(tokenLike) {
+  analyzeHint.classList.add("hidden");
+  analyzeResultCard.classList.remove("hidden");
+
+  analyzeNameEl.textContent = `${tokenLike.name} (${tokenLike.symbol})`;
+  analyzeStatusEl.className = "status-pill"; // reset classes
+  if (tokenLike.status === "trusted") {
+    analyzeStatusEl.classList.add("status-trusted");
+    analyzeStatusEl.textContent = "Trusted";
+  } else if (tokenLike.status === "risky") {
+    analyzeStatusEl.classList.add("status-risky");
+    analyzeStatusEl.textContent = "Risky";
+  } else {
+    analyzeStatusEl.classList.add("status-unknown");
+    analyzeStatusEl.textContent = "Unknown";
+  }
+
+  analyzeAddressEl.textContent = tokenLike.address;
+  analyzeHoldersEl.textContent = tokenLike.holders ?? "Unknown";
+  analyzeNotesEl.textContent = tokenLike.notes || "No additional notes.";
+}
+
+analyzeForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const value = addressInput.value.trim();
+
+  if (!value || !value.startsWith("0x") || value.length < 20) {
+    showToast("Please enter a valid token contract address (0x...)");
+    return;
+  }
+
+  const known = findTokenByAddress(value);
+  if (known) {
+    showAnalyzeResult(known);
+  } else {
+    const { status, holders, notes } = classifyUnknownAddress(value);
+    const pseudoToken = {
+      name: "Unknown token",
+      symbol: "???",
+      address: value,
+      holders,
+      status,
+      notes
+    };
+    showAnalyzeResult(pseudoToken);
+  }
+
+  smoothScrollTo(analyzeResultCard);
+});
+
+// Copy from result card
+copyAnalyzeAddressBtn.addEventListener("click", () => {
+  const addr = analyzeAddressEl.textContent.trim();
+  if (!addr) return;
+  copyToClipboard(addr, "Address copied");
+});
+
+// =======================================================
+//  Filters
+// =======================================================
+filterButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const filter = btn.getAttribute("data-filter");
+    currentFilter = filter;
+
+    filterButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    renderTable();
+  });
+});
+
+// =======================================================
+//  Utils – toast, scroll, clipboard
+// =======================================================
+function showToast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.remove("hidden");
+
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => {
+    toastEl.classList.add("hidden");
+  }, 2000);
+}
+
+function copyToClipboard(text, msg) {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => showToast(msg || "Copied"))
+    .catch(() => showToast("Failed to copy"));
+}
+
+function smoothScrollTo(elem) {
+  if (!elem) return;
+  const rect = elem.getBoundingClientRect();
+  const absoluteTop = window.scrollY + rect.top - 80;
+  window.scrollTo({ top: absoluteTop, behavior: "smooth" });
+}
+
+// =======================================================
+//  Init
+// =======================================================
+renderTable();
