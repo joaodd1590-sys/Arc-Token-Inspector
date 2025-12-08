@@ -1,6 +1,6 @@
 // =======================================================
 //  Arc Token Inspector – LIVE VERSION (ArcScan API)
-//  With REAL token list + risk analysis
+//  Fully Fixed for new API format
 // =======================================================
 
 // DOM refs
@@ -21,42 +21,38 @@ const copyAnalyzeAddressBtn = document.getElementById("copyAnalyzeAddress");
 const toastEl = document.getElementById("toast");
 
 let currentFilter = "all";
-let LIVE_TOKENS = []; // dynamically filled
+let LIVE_TOKENS = [];
 
 // =======================================================
-//  ArcScan API: Fetch single token info
+//  FETCH TOKEN INFO (SINGLE TOKEN)
 // =======================================================
 
 async function fetchTokenInfo(address) {
   const base = "https://testnet.arcscan.app/api";
 
   try {
-    // Metadata
     const metaRes = await fetch(
       `${base}?module=token&action=getToken&contractaddress=${address}`
     );
     const metaJson = await metaRes.json();
+
     if (!metaJson?.result) return null;
 
     const token = metaJson.result;
 
-    // Holders
-    const holdersRes = await fetch(
-      `${base}?module=token&action=getTokenHolders&contractaddress=${address}`
-    );
-    const holdersJson = await holdersRes.json();
-    const holders = holdersJson?.result?.holders ?? "?";
+    // API nova NÃO fornece holders → "Unknown"
+    const holders = token.holders ?? "Unknown";
 
-    const risk = classifyRisk(token, holders);
+    // Risco simplificado (não existe mais "verified")
+    const risk = classifyRiskSimple(holders);
 
     return {
       name: token.name || "Unknown",
       symbol: token.symbol || "???",
-      address,
+      address: token.contractAddress || address,
       holders,
       decimals: token.decimals ?? "?",
       totalSupply: token.totalSupply ?? "?",
-      verified: token.verified === "true",
       status: risk.status,
       notes: risk.notes
     };
@@ -67,7 +63,7 @@ async function fetchTokenInfo(address) {
 }
 
 // =======================================================
-//  ArcScan API: Fetch ALL tokens in ARC Testnet
+//  FETCH ALL TOKENS (LISTA REAL)
 // =======================================================
 
 async function fetchTokenList() {
@@ -79,22 +75,21 @@ async function fetchTokenList() {
 
     if (!json?.result || !Array.isArray(json.result)) return [];
 
-    const list = json.result.map((t) => {
-      const risk = classifyRisk(t, t.holders ?? "?");
+    return json.result.map((t) => {
+      const holders = t.holders ?? "Unknown";
+      const risk = classifyRiskSimple(holders);
 
       return {
         name: t.name || "Unknown",
         symbol: t.symbol || "???",
         address: t.contractAddress,
-        holders: t.holders ?? "?",
-        verified: t.verified === "true",
+        holders,
         decimals: t.decimals ?? "?",
+        totalSupply: t.totalSupply ?? "?",
         status: risk.status,
         notes: risk.notes
       };
     });
-
-    return list;
   } catch (err) {
     console.error("ERROR fetchTokenList:", err);
     return [];
@@ -102,44 +97,34 @@ async function fetchTokenList() {
 }
 
 // =======================================================
-//  RISK ANALYSIS ENGINE
+//  SIMPLE RISK ENGINE (NO VERIFIED FIELD)
 // =======================================================
 
-function classifyRisk(token, holders) {
+function classifyRiskSimple(holders) {
   const h = Number(holders);
 
-  // Verified + Many holders
-  if (token.verified === "true" && h > 50) {
+  if (h > 50) {
     return {
       status: "trusted",
-      notes: "Verified contract with healthy number of holders."
+      notes: "Healthy number of holders."
     };
   }
 
-  // Very few holders
   if (h > 0 && h <= 3) {
     return {
       status: "risky",
-      notes: "Very few holders — high rug risk. DYOR."
-    };
-  }
-
-  // Unverified
-  if (token.verified !== "true") {
-    return {
-      status: "unknown",
-      notes: "Unverified contract — review before interacting."
+      notes: "Very few holders — high rug risk."
     };
   }
 
   return {
     status: "unknown",
-    notes: "Insufficient data — proceed with caution."
+    notes: "Unverified token — review before interacting."
   };
 }
 
 // =======================================================
-//  ANALYZE RESULT CARD
+//  ANALYSIS RESULT CARD
 // =======================================================
 
 function showAnalyzeResult(token) {
@@ -166,13 +151,14 @@ function showAnalyzeResult(token) {
 }
 
 // =======================================================
-//  ANALYZE FORM SUBMIT
+//  FORM SUBMIT – ANALYZE TOKEN BY ADDRESS
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const value = addressInput.value.trim();
+
   if (!value.startsWith("0x") || value.length < 20) {
     showToast("Please enter a valid contract address.");
     return;
@@ -181,6 +167,7 @@ analyzeForm.addEventListener("submit", async (e) => {
   showToast("Fetching data...");
 
   const token = await fetchTokenInfo(value);
+
   if (!token) {
     showToast("Token not found.");
     return;
@@ -191,7 +178,7 @@ analyzeForm.addEventListener("submit", async (e) => {
 });
 
 // =======================================================
-//  TABLE RENDERING (REAL DATA)
+//  TABLE RENDERING – REAL DATA
 // =======================================================
 
 function shortAddr(addr) {
@@ -238,7 +225,7 @@ function renderTable() {
   filtered.forEach((token) => {
     const tr = document.createElement("tr");
 
-    // Token name
+    // Token name + symbol
     const tdToken = document.createElement("td");
     tdToken.innerHTML = `
       <span class="token-name">${token.name}</span>
@@ -302,7 +289,7 @@ filterButtons.forEach((btn) => {
 });
 
 // =======================================================
-//  TOAST + UTILS
+//  UTILITIES
 // =======================================================
 
 function showToast(message) {
@@ -329,7 +316,7 @@ function smoothScrollTo(elem) {
 }
 
 // =======================================================
-//  INIT – LOAD TOKEN LIST
+//  INIT – LOAD REAL TOKEN LIST
 // =======================================================
 
 (async function init() {
