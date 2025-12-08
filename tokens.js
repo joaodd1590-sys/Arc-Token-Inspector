@@ -37,11 +37,8 @@ async function handleAnalyze() {
       return;
     }
 
-    // Fill token info
-    fillTokenInfo(address, data);
-
-    // Compute risk signal
-    applyRiskSignal(address, data);
+    fillTokenInfo(address, data);   // Fill token info
+    applyRiskSignal(address, data); // Calculate color + text
 
     tokenCard.classList.remove("hidden");
     riskCard.classList.remove("hidden");
@@ -72,11 +69,11 @@ function fillTokenInfo(address, token) {
   titleEl.textContent = `${token.name || "Token"} (${token.symbol || "?"})`;
   addrShortEl.textContent = shortenAddress(address);
 
-  // avatar = first letter of symbol or name
   const label =
     (token.symbol && token.symbol[0]) ||
     (token.name && token.name[0]) ||
     "?";
+
   avatarEl.textContent = label.toUpperCase();
 }
 
@@ -97,8 +94,7 @@ function formatHumanSupply(raw, decimals) {
     const fracPart = big % factor;
 
     let fracStr = fracPart.toString().padStart(d, "0");
-    // show only first 4 decimals for UI
-    fracStr = fracStr.slice(0, 4);
+    fracStr = fracStr.slice(0, 4); // show only 4 decimal places
 
     return `${intPart.toLocaleString("en-US")}.${fracStr}`;
   } catch (e) {
@@ -106,11 +102,10 @@ function formatHumanSupply(raw, decimals) {
   }
 }
 
-/**
- * Heuristic risk signal
- * - trusted if in allowlist
- * - else score based on decimals, name/symbol length, totalSupply, address pattern
- */
+/* ---------------------------
+      RISK ENGINE (COLORS)
+---------------------------- */
+
 function applyRiskSignal(address, token) {
   const normalized = address.toLowerCase();
   const trusted = TRUSTED_TOKENS[normalized];
@@ -120,68 +115,51 @@ function applyRiskSignal(address, token) {
   const riskDesc = document.getElementById("riskDescription");
   const verifiedBadge = document.getElementById("verifiedBadge");
 
-  // reset classes
-  riskPill.className = "risk-pill risk-unknown";
+  // RESET CORRECTLY – KEEP ONLY BASE CLASS
+  riskPill.className = "risk-pill";
   verifiedBadge.classList.add("hidden");
 
-  // -------------------------
-  // TRUSTED TOKEN (verde)
-  // -------------------------
+  /* ========= TRUSTED TOKEN ========= */
   if (trusted) {
     riskPill.textContent = "Trusted";
-    riskPill.classList.add("risk-safe"); // GREEN BADGE
+    riskPill.classList.add("risk-safe");
     verifiedBadge.classList.remove("hidden");
 
     riskTitle.textContent = `${token.symbol || "Token"} is marked as trusted.`;
     riskDesc.textContent =
       trusted.note +
       " · Still, always verify URLs, contracts and official documentation.";
-
     return;
   }
 
-  // -------------------------
-  // Compute heuristic score
-  // -------------------------
+  /* ========= HEURISTIC RISK SCORE ========= */
+
   let score = 0;
 
   const decimals = Number(token.decimals || 0);
   const supplyStr = token.totalSupply || "0";
+
   let supply = 0n;
-  try {
-    supply = BigInt(supplyStr);
-  } catch {}
+  try { supply = BigInt(supplyStr); } catch {}
 
-  // suspicious decimals
   if (decimals > 18 || decimals === 0) score += 2;
-
-  // weird name/symbol
   if (!token.name || token.name.length < 3) score += 1;
-  if (!token.symbol || token.symbol.length < 2 || token.symbol.length > 8)
-    score += 1;
-
-  // extremely small or huge supply
+  if (!token.symbol || token.symbol.length < 2 || token.symbol.length > 8) score += 1;
   if (supply === 0n) score += 2;
   if (supply > 10n ** 40n) score += 2;
-
-  // address pattern
   if (normalized.startsWith("0x000000")) score += 2;
 
-  // -------------------------
-  // SCORE → LABEL
-  // -------------------------
   let level = "safe";
   if (score >= 5) level = "danger";
   else if (score >= 3) level = "warning";
   else if (score >= 1) level = "caution";
 
-  // -------------------------
-  // APPLY UI COLORS
-  // -------------------------
+  /* ========= APPLY COLORS + TEXT ========= */
 
   if (level === "safe") {
     riskPill.textContent = "Likely Safe";
-    riskPill.classList.add("risk-safe"); // GREEN
+    riskPill.classList.add("risk-safe");
+
     riskTitle.textContent = "No obvious red flags detected.";
     riskDesc.textContent =
       "Basic heuristics did not detect major issues. This does NOT guarantee safety — always DYOR.";
@@ -189,25 +167,28 @@ function applyRiskSignal(address, token) {
 
   else if (level === "caution") {
     riskPill.textContent = "Caution";
-    riskPill.classList.add("risk-warning"); // YELLOW
+    riskPill.classList.add("risk-warning");
+
     riskTitle.textContent = "Some mildly suspicious characteristics.";
     riskDesc.textContent =
-      "Symbol/name or supply configuration look a bit unusual. Review the contract and project carefully.";
+      "Symbol/name or supply config look a bit unusual. Review the contract carefully.";
   }
 
   else if (level === "warning") {
     riskPill.textContent = "Risky";
-    riskPill.classList.add("risk-warning"); // YELLOW/ORANGE
+    riskPill.classList.add("risk-warning");
+
     riskTitle.textContent = "Several red flags found.";
     riskDesc.textContent =
-      "Decimals, supply or address pattern look quite suspicious. Treat this token as high risk.";
+      "Decimals, supply or address pattern look suspicious. Treat this token as high risk.";
   }
 
   else {
     riskPill.textContent = "High Risk";
-    riskPill.classList.add("risk-danger"); // RED
+    riskPill.classList.add("risk-danger");
+
     riskTitle.textContent = "Strong red flags — avoid interacting.";
     riskDesc.textContent =
-      "On-chain metadata strongly suggests this may be a scam or broken token. Do NOT use this contract.";
+      "This token may be a scam or broken. Avoid interacting.";
   }
 }
