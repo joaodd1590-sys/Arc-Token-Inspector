@@ -12,10 +12,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔥 AQUI ESTÁ A API INTERNA OFICIAL DO ARCSCAN
+    // 🔥 URL interna oficial usada pelo ArcScan (Next.js data fetch)
     const ARC_INTERNAL_URL =
-      `https://testnet.arcscan.app/api/v2/tokens/advanced-filter.json` +
-      `?token_contract_address_hashes[]=${address}`;
+      `https://testnet.arcscan.app/_next/data/PT2Y1HFDaA9IV807_Kj/advanced-filter.json` +
+      `?token_contract_address_hashes_to_include=${address}`;
 
     const resp = await fetch(ARC_INTERNAL_URL, {
       headers: {
@@ -33,15 +33,21 @@ export default async function handler(req, res) {
 
     const raw = await resp.json();
 
-    // Normalmente os dados vêm em raw.items[0]
-    const item = raw?.items?.[0] || {};
+    // Estrutura real do Next.js:
+    // raw.pageProps.tokens.items[0]
+    const item = raw?.pageProps?.tokens?.items?.[0];
+
+    if (!item) {
+      res.status(404).json({ error: "Token not found in Arc internal API" });
+      return;
+    }
 
     const token = {
       name: item.name || "Unknown",
       symbol: item.symbol || "???",
       decimals: item.decimals || null,
       totalSupply: item.total_supply || null,
-      holders: item.holders || null
+      holders: item.holders || item.holder_count || null
     };
 
     res.status(200).json(token);
