@@ -1,4 +1,4 @@
-// Known trusted tokens
+// Known trusted ARC tokens
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
@@ -7,53 +7,68 @@ const TRUSTED_TOKENS = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
+  document.getElementById("analyzeBtn").onclick = handleAnalyze;
+  document.getElementById("themeToggle").onclick = toggleTheme;
+});
+
+// Theme toggle
+function toggleTheme() {
+  document.body.classList.toggle("dark");
+}
+
+// Mainnet blocked
+const netSelect = document.getElementById("networkSelect");
+netSelect.addEventListener("change", () => {
+  if (netSelect.value === "mainnet") {
+    alert("Mainnet support is coming soon.");
+    netSelect.value = "testnet";
+  }
 });
 
 async function handleAnalyze() {
   const address = document.getElementById("tokenAddress").value.trim();
-  const status = document.getElementById("statusMsg");
+  const statusMsg = document.getElementById("statusMsg");
 
-  if (!address.startsWith("0x") || address.length < 10) {
-    alert("Please enter a valid contract address.");
+  if (!address.startsWith("0x") || address.length < 20) {
+    alert("Enter a valid ARC-20 address.");
     return;
   }
 
-  status.textContent = "Loading token data…";
+  statusMsg.textContent = "Loading token...";
 
   try {
     const resp = await fetch(`/api/arc-token?address=${address}`);
     const data = await resp.json();
 
-    if (!resp.ok || !data.name) {
-      status.textContent = "Error loading token.";
+    if (!resp.ok || !data || !data.symbol) {
+      statusMsg.textContent = "Error loading token.";
       return;
     }
 
+    statusMsg.textContent = "Token loaded successfully.";
+
     fillTokenInfo(address, data);
-    applyRisk(address, data);
-    renderWhy(address, data);
+    applyRiskSignal(address, data);
 
-    document.getElementById("riskCard").classList.remove("hidden");
     document.getElementById("tokenCard").classList.remove("hidden");
-    document.getElementById("whySection").classList.remove("hidden");
+    document.getElementById("riskCard").classList.remove("hidden");
 
-    status.textContent =
-      "Token loaded successfully. Always cross-check with the official explorer.";
-
-  } catch (err) {
-    console.error(err);
-    status.textContent = "Error loading token.";
+  } catch (e) {
+    statusMsg.textContent = "Loading failed.";
   }
 }
 
 function fillTokenInfo(address, token) {
-  document.getElementById("tName").textContent = token.name || "-";
-  document.getElementById("tSymbol").textContent = token.symbol || "-";
-  document.getElementById("tDecimals").textContent = token.decimals ?? "-";
-  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
-  document.getElementById("tSupplyHuman").textContent =
-    formatHuman(token.totalSupply, token.decimals);
+  document.getElementById("tName").textContent = token.name;
+  document.getElementById("tSymbol").textContent = token.symbol;
+  document.getElementById("tDecimals").textContent = token.decimals;
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply;
+
+  const human = formatHumanSupply(token.totalSupply, token.decimals);
+  document.getElementById("tSupplyHuman").textContent = human;
+
+  document.getElementById("tokenAvatar").textContent =
+    token.symbol?.[0]?.toUpperCase() || "?";
 
   document.getElementById("tokenTitle").textContent =
     `${token.name} (${token.symbol})`;
@@ -61,107 +76,110 @@ function fillTokenInfo(address, token) {
   document.getElementById("tokenAddressShort").textContent =
     address.slice(0, 6) + "..." + address.slice(-4);
 
-  const avatar = document.getElementById("tokenAvatar");
-  avatar.textContent = (token.symbol?.[0] || "?").toUpperCase();
 }
 
-function formatHuman(raw, decimals) {
-  if (!raw) return "-";
-  const big = BigInt(raw);
-  const factor = 10n ** BigInt(decimals || 0);
-  const whole = big / factor;
-  return whole.toLocaleString();
+function formatHumanSupply(raw, decimals) {
+  try {
+    const d = Number(decimals);
+    const big = BigInt(raw);
+    const factor = BigInt(10) ** BigInt(d);
+    const whole = big / factor;
+    const frac = (big % factor).toString().padStart(d, "0").slice(0, 4);
+    return `${whole.toLocaleString()} . ${frac}`;
+  } catch {
+    return raw;
+  }
 }
 
-// RISK SCORING
-function applyRisk(address, token) {
-  const pill = document.getElementById("riskPill");
-  const verified = document.getElementById("verifiedBadge");
-  const title = document.getElementById("riskTitle");
-  const desc = document.getElementById("riskDescription");
+function applyRiskSignal(address, token) {
+  const normalized = address.toLowerCase();
 
-  pill.className = "risk-pill risk-unknown";
-  verified.classList.add("hidden");
+  const riskPill = document.getElementById("riskPill");
+  const riskReasons = document.getElementById("riskReasons");
+  const verifiedBadge = document.getElementById("verifiedBadge");
 
-  const isTrusted = TRUSTED_TOKENS[address.toLowerCase()];
+  riskReasons.innerHTML = "";
+  riskPill.className = "risk-pill risk-unknown";
+  verifiedBadge.classList.add("hidden");
 
   let score = 0;
+  const reasons = [];
 
-  // decimals rule
-  if (token.decimals === 0 || token.decimals > 18) score += 2;
+  // TRUSTED TOKEN
+  if (TRUSTED_TOKENS[normalized]) {
+    riskPill.textContent = "Trusted";
+    riskPill.classList.add("risk-safe");
+    verifiedBadge.classList.remove("hidden");
+    reasons.push("✔ This contract is on the trusted allowlist.");
+    renderReasons(reasons);
+    return;
+  }
 
-  // supply
-  if (!token.totalSupply || token.totalSupply === "0") score += 2;
+  // DECIMALS
+  if (token.decimals === 0 || token.decimals > 18) {
+    score += 2;
+    reasons.push("⚠ Token uses unusual decimals.");
+  } else {
+    reasons.push("✔ Decimals look normal.");
+  }
 
-  // name/symbol
-  if (!token.symbol || token.symbol.length < 2) score += 1;
+  // NAME / SYMBOL
+  if (!token.symbol || token.symbol.length < 2 || token.symbol.length > 10) {
+    score += 1;
+    reasons.push("⚠ Symbol looks unusually short/long.");
+  } else {
+    reasons.push("✔ Symbol structure looks normal.");
+  }
 
+  // TOTAL SUPPLY
+  try {
+    const supply = BigInt(token.totalSupply);
+    if (supply === 0n) {
+      score += 2;
+      reasons.push("⚠ Total supply is zero — token may be broken.");
+    } else {
+      reasons.push("✔ Supply value appears valid.");
+    }
+  } catch {}
+
+  // ADDRESS PATTERN
+  if (normalized.startsWith("0x000000")) {
+    score += 1;
+    reasons.push("⚠ Contract address pattern looks suspicious.");
+  } else {
+    reasons.push("✔ Address pattern is normal.");
+  }
+
+  // MAP SCORE → LEVEL
   let level = "safe";
   if (score >= 5) level = "danger";
   else if (score >= 3) level = "warning";
   else if (score >= 1) level = "caution";
 
-  if (isTrusted) {
-    pill.textContent = "Trusted";
-    pill.classList.add("risk-safe");
-    verified.classList.remove("hidden");
-    title.textContent = token.symbol + " is marked as trusted.";
-    desc.textContent = isTrusted.note;
-    return;
+  if (level === "safe") {
+    riskPill.textContent = "Likely Safe";
+    riskPill.classList.add("risk-safe");
+  } else if (level === "caution") {
+    riskPill.textContent = "Caution";
+    riskPill.classList.add("risk-warning");
+  } else if (level === "warning") {
+    riskPill.textContent = "Risky";
+    riskPill.classList.add("risk-warning");
+  } else {
+    riskPill.textContent = "High Risk";
+    riskPill.classList.add("risk-danger", "glow-danger");
   }
 
-  if (level === "safe") {
-    pill.textContent = "Likely Safe";
-    pill.classList.add("risk-safe");
-    title.textContent = "No major red flags detected.";
-    desc.textContent = "Heuristic evaluation passed.";
-  } else if (level === "caution") {
-    pill.textContent = "Caution";
-    pill.classList.add("risk-warning");
-    title.textContent = "Some unusual characteristics detected.";
-    desc.textContent = "Review contract and metadata.";
-  } else if (level === "warning") {
-    pill.textContent = "Risky";
-    pill.classList.add("risk-warning");
-    title.textContent = "Multiple suspicious properties.";
-    desc.textContent =
-      "Token configurations suggest elevated risk; proceed carefully.";
-  } else {
-    pill.textContent = "High Risk";
-    pill.classList.add("risk-danger");
-    title.textContent = "Severe red flags detected.";
-    desc.textContent = "Avoid interacting with this contract.";
-  }
+  renderReasons(reasons);
 }
 
-// WHY SECTION
-function renderWhy(address, token) {
-  const list = document.getElementById("whyList");
-  list.innerHTML = "";
-
-  const rules = [];
-
-  rules.push(
-    token.decimals === 0
-      ? "⚠️ Decimals: Token has 0 decimals — uncommon configuration."
-      : "✔ Decimals: Value appears normal."
-  );
-
-  rules.push(
-    (!token.symbol || token.symbol.length < 2)
-      ? "⚠️ Name/Symbol: Symbol too short or malformed."
-      : "✔ Name/Symbol: Appears valid."
-  );
-
-  rules.push(
-    token.totalSupply === "0"
-      ? "⚠️ Total Supply: Zero supply suggests token may be broken."
-      : "✔ Total Supply: Supply appears normal."
-  );
-
-  rules.forEach((r) => {
+// Render WHY breakdown
+function renderReasons(list) {
+  const ul = document.getElementById("riskReasons");
+  ul.innerHTML = "";
+  list.forEach(reason => {
     const li = document.createElement("li");
-    li.textContent = r;
-    list.appendChild(li);
+    li.textContent = reason;
+    ul.appendChild(li);
   });
 }
