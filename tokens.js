@@ -1,6 +1,5 @@
 // =======================================================
-//  Arc Token Inspector – FULL LIVE VERSION (FINAL)
-//  Using ARC Testnet API v1 + API v2
+//  ARC TOKEN INSPECTOR – FINAL FIXED VERSION (API v1 + v2)
 // =======================================================
 
 // DOM refs
@@ -31,39 +30,32 @@ function classifyRiskSimple(holders) {
   const h = Number(holders);
 
   if (h > 50) {
-    return {
-      status: "trusted",
-      notes: "Healthy number of holders."
-    };
+    return { status: "trusted", notes: "Healthy number of holders." };
   }
 
   if (h > 0 && h <= 3) {
-    return {
-      status: "risky",
-      notes: "Very few holders — high rug risk."
-    };
+    return { status: "risky", notes: "Very few holders — high rug risk." };
   }
 
-  return {
-    status: "unknown",
-    notes: "Unverified token — review before interacting."
-  };
+  return { status: "unknown", notes: "Unverified token — review before interacting." };
 }
 
 // =======================================================
-//  FETCH TOKEN INFO (ANÁLISE INDIVIDUAL) – API v1 + v2
+//  FETCH TOKEN INFO – INDIVIDUAL ANALYSIS
+//  Uses API v1 (getToken) + API v2 (search)
 // =======================================================
 
 async function fetchTokenInfo(address) {
   const baseV1 = "https://testnet.arcscan.app/api";
-  const baseV2 = "https://testnet.arcscan.app/api/v2";
+  const baseV2 = "https://testnet.arcscan.app/api/v2/tokens?search=";
 
   let name = "Unknown";
   let symbol = "???";
   let decimals = "?";
   let totalSupply = "?";
+  let holders = "Unknown";
 
-  // ===== STEP 1: API V1 → name + symbol + decimals (if cataloged)
+  // STEP 1 — API v1 (name + symbol + decimals)
   try {
     const r1 = await fetch(
       `${baseV1}?module=token&action=getToken&contractaddress=${address}`
@@ -77,24 +69,26 @@ async function fetchTokenInfo(address) {
       if (j1.result.totalSupply) totalSupply = j1.result.totalSupply;
     }
   } catch (err) {
-    console.error("API v1 error", err);
+    console.log("API v1 failed");
   }
 
-  // ===== STEP 2: API V2 → holders + address + decimals + supply (ALWAYS WORKS)
-  let holders = "Unknown";
-
+  // STEP 2 — API v2 search (holders + address + decimals + supply)
   try {
-    const r2 = await fetch(`${baseV2}/tokens/${address}`);
+    const r2 = await fetch(`${baseV2}${address}`);
     const j2 = await r2.json();
 
-    if (j2?.address) address = j2.address;
-    if (j2?.holders !== undefined) holders = j2.holders;
-    if (j2?.decimals !== undefined) decimals = j2.decimals;
-    if (j2?.total_supply !== undefined) totalSupply = j2.total_supply;
-    if (j2?.name) name = j2.name;
-    if (j2?.symbol) symbol = j2.symbol;
+    if (j2?.items?.length > 0) {
+      const t = j2.items[0];
+
+      if (t.address) address = t.address;
+      if (t.name) name = t.name;
+      if (t.symbol) symbol = t.symbol;
+      if (t.decimals !== undefined) decimals = t.decimals;
+      if (t.total_supply !== undefined) totalSupply = t.total_supply;
+      if (t.holders !== undefined) holders = t.holders;
+    }
   } catch (err) {
-    console.error("API v2 error", err);
+    console.log("API v2 search failed");
   }
 
   const risk = classifyRiskSimple(holders);
@@ -107,12 +101,12 @@ async function fetchTokenInfo(address) {
     decimals,
     totalSupply,
     status: risk.status,
-    notes: risk.notes
+    notes: risk.notes,
   };
 }
 
 // =======================================================
-//  FETCH TOKEN LIST REAL – API v2 (with pagination)
+//  FETCH TOKEN LIST (API v2 pagination)
 // =======================================================
 
 async function fetchTokenList() {
@@ -123,14 +117,14 @@ async function fetchTokenList() {
   try {
     while (true) {
       const url = next ? `${base}?${next}` : base;
+
       const res = await fetch(url);
       const json = await res.json();
 
       if (!json?.items) break;
 
       json.items.forEach((t) => {
-        const holders = t.holders ?? "Unknown";
-        const risk = classifyRiskSimple(holders);
+        const risk = classifyRiskSimple(t.holders ?? "Unknown");
 
         all.push({
           name: t.name || "Unknown",
@@ -140,7 +134,7 @@ async function fetchTokenList() {
           decimals: t.decimals,
           totalSupply: t.total_supply,
           status: risk.status,
-          notes: risk.notes
+          notes: risk.notes,
         });
       });
 
@@ -149,14 +143,14 @@ async function fetchTokenList() {
       next = new URLSearchParams(json.next_page_params).toString();
     }
   } catch (err) {
-    console.error("ERROR fetchTokenList:", err);
+    console.error("Error loading token list", err);
   }
 
   return all;
 }
 
 // =======================================================
-//  ANALYSIS PANEL RENDER
+//  RENDER ANALYSIS PANEL
 // =======================================================
 
 function showAnalyzeResult(token) {
@@ -173,7 +167,8 @@ function showAnalyzeResult(token) {
       ? "status-risky"
       : "status-unknown"
   );
-  analyzeStatusEl.textContent = token.status[0].toUpperCase() + token.status.slice(1);
+  analyzeStatusEl.textContent =
+    token.status.charAt(0).toUpperCase() + token.status.slice(1);
 
   analyzeAddressEl.textContent = token.address;
   analyzeHoldersEl.textContent = token.holders;
@@ -181,7 +176,7 @@ function showAnalyzeResult(token) {
 }
 
 // =======================================================
-//  FORM SUBMIT (ANALYZE TOKEN)
+//  SUBMIT ANALYSIS FORM
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
@@ -194,7 +189,7 @@ analyzeForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  showToast("Fetching token data...");
+  showToast("Fetching data...");
 
   const token = await fetchTokenInfo(addr);
 
@@ -216,10 +211,10 @@ function shortAddr(addr) {
 }
 
 function createStatusPill(status) {
-  const span = document.createElement("span");
-  span.classList.add("status-pill");
+  const pill = document.createElement("span");
+  pill.classList.add("status-pill");
 
-  span.classList.add(
+  pill.classList.add(
     status === "trusted"
       ? "status-trusted"
       : status === "risky"
@@ -227,8 +222,8 @@ function createStatusPill(status) {
       : "status-unknown"
   );
 
-  span.textContent = status[0].toUpperCase() + status.slice(1);
-  return span;
+  pill.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+  return pill;
 }
 
 function renderTable() {
@@ -244,7 +239,7 @@ function renderTable() {
     td.colSpan = 5;
     td.textContent = "No tokens match this filter.";
     td.style.color = "var(--text-muted)";
-    td.style.padding = "14px 10px";
+    td.style.padding = "14px";
     tr.appendChild(td);
     tableBody.appendChild(tr);
     return;
@@ -282,7 +277,8 @@ function renderTable() {
     const copyBtn = document.createElement("button");
     copyBtn.className = "btn-ghost btn-copy";
     copyBtn.textContent = "Copy";
-    copyBtn.onclick = () => copyToClipboard(token.address, "Address copied");
+    copyBtn.onclick = () =>
+      copyToClipboard(token.address, "Address copied");
 
     tdActions.appendChild(viewBtn);
     tdActions.appendChild(copyBtn);
@@ -298,7 +294,7 @@ function renderTable() {
 }
 
 // =======================================================
-//  FILTERS
+//  FILTER BUTTONS
 // =======================================================
 
 filterButtons.forEach((btn) => {
@@ -319,9 +315,7 @@ function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.remove("hidden");
   clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => {
-    toastEl.classList.add("hidden");
-  }, 2000);
+  showToast._timer = setTimeout(() => toastEl.classList.add("hidden"), 2000);
 }
 
 function copyToClipboard(text, msg) {
@@ -337,7 +331,7 @@ function smoothScrollTo(elem) {
 }
 
 // =======================================================
-//  INIT – LOAD REAL TOKEN LIST
+//  INIT – LOAD ALL TOKENS
 // =======================================================
 
 (async function init() {
