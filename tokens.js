@@ -1,5 +1,6 @@
 // =======================================================
 //  Arc Token Inspector – LIVE VERSION (ArcScan API)
+//  With REAL token list + risk analysis
 // =======================================================
 
 // DOM refs
@@ -20,43 +21,39 @@ const copyAnalyzeAddressBtn = document.getElementById("copyAnalyzeAddress");
 const toastEl = document.getElementById("toast");
 
 let currentFilter = "all";
+let LIVE_TOKENS = []; // dynamically filled
 
 // =======================================================
-//  ARCSCAN LIVE TOKEN LOOKUP
+//  ArcScan API: Fetch single token info
 // =======================================================
 
 async function fetchTokenInfo(address) {
   const base = "https://testnet.arcscan.app/api";
 
   try {
-    // 1) Fetch token metadata
+    // Metadata
     const metaRes = await fetch(
       `${base}?module=token&action=getToken&contractaddress=${address}`
     );
     const metaJson = await metaRes.json();
-
     if (!metaJson?.result) return null;
 
     const token = metaJson.result;
 
-    // 2) Fetch holders count
+    // Holders
     const holdersRes = await fetch(
       `${base}?module=token&action=getTokenHolders&contractaddress=${address}`
     );
     const holdersJson = await holdersRes.json();
-
-    let holders = "?";
-    if (holdersJson?.result?.holders) {
-      holders = holdersJson.result.holders;
-    }
+    const holders = holdersJson?.result?.holders ?? "?";
 
     const risk = classifyRisk(token, holders);
 
     return {
       name: token.name || "Unknown",
       symbol: token.symbol || "???",
-      address: address,
-      holders: holders,
+      address,
+      holders,
       decimals: token.decimals ?? "?",
       totalSupply: token.totalSupply ?? "?",
       verified: token.verified === "true",
@@ -64,33 +61,70 @@ async function fetchTokenInfo(address) {
       notes: risk.notes
     };
   } catch (err) {
-    console.error("ERROR fetching token:", err);
+    console.error("ERROR fetchTokenInfo:", err);
     return null;
   }
 }
 
 // =======================================================
-//  RISK ANALYSIS
+//  ArcScan API: Fetch ALL tokens in ARC Testnet
+// =======================================================
+
+async function fetchTokenList() {
+  const base = "https://testnet.arcscan.app/api";
+
+  try {
+    const res = await fetch(`${base}?module=token&action=tokenlist`);
+    const json = await res.json();
+
+    if (!json?.result || !Array.isArray(json.result)) return [];
+
+    const list = json.result.map((t) => {
+      const risk = classifyRisk(t, t.holders ?? "?");
+
+      return {
+        name: t.name || "Unknown",
+        symbol: t.symbol || "???",
+        address: t.contractAddress,
+        holders: t.holders ?? "?",
+        verified: t.verified === "true",
+        decimals: t.decimals ?? "?",
+        status: risk.status,
+        notes: risk.notes
+      };
+    });
+
+    return list;
+  } catch (err) {
+    console.error("ERROR fetchTokenList:", err);
+    return [];
+  }
+}
+
+// =======================================================
+//  RISK ANALYSIS ENGINE
 // =======================================================
 
 function classifyRisk(token, holders) {
-  // RULE 1: Verified contract + good holder count → trusted
-  if (token.verified === "true" && holders > 50) {
+  const h = Number(holders);
+
+  // Verified + Many holders
+  if (token.verified === "true" && h > 50) {
     return {
       status: "trusted",
       notes: "Verified contract with healthy number of holders."
     };
   }
 
-  // RULE 2: Very low holders → risky
-  if (Number(holders) <= 3) {
+  // Very few holders
+  if (h > 0 && h <= 3) {
     return {
       status: "risky",
       notes: "Very few holders — high rug risk. DYOR."
     };
   }
 
-  // RULE 3: Unverified → unknown
+  // Unverified
   if (token.verified !== "true") {
     return {
       status: "unknown",
@@ -105,21 +139,20 @@ function classifyRisk(token, holders) {
 }
 
 // =======================================================
-//  Analyze result renderer
+//  ANALYZE RESULT CARD
 // =======================================================
 
-function showAnalyzeResult(tokenLike) {
+function showAnalyzeResult(token) {
   analyzeHint.classList.add("hidden");
   analyzeResultCard.classList.remove("hidden");
 
-  analyzeNameEl.textContent = `${tokenLike.name} (${tokenLike.symbol})`;
+  analyzeNameEl.textContent = `${token.name} (${token.symbol})`;
 
-  // Reset pill
   analyzeStatusEl.className = "status-pill";
-  if (tokenLike.status === "trusted") {
+  if (token.status === "trusted") {
     analyzeStatusEl.classList.add("status-trusted");
     analyzeStatusEl.textContent = "Trusted";
-  } else if (tokenLike.status === "risky") {
+  } else if (token.status === "risky") {
     analyzeStatusEl.classList.add("status-risky");
     analyzeStatusEl.textContent = "Risky";
   } else {
@@ -127,21 +160,20 @@ function showAnalyzeResult(tokenLike) {
     analyzeStatusEl.textContent = "Unknown";
   }
 
-  analyzeAddressEl.textContent = tokenLike.address;
-  analyzeHoldersEl.textContent = tokenLike.holders ?? "Unknown";
-  analyzeNotesEl.textContent = tokenLike.notes || "No additional notes.";
+  analyzeAddressEl.textContent = token.address;
+  analyzeHoldersEl.textContent = token.holders;
+  analyzeNotesEl.textContent = token.notes;
 }
 
 // =======================================================
-//  Form submission (real API mode)
+//  ANALYZE FORM SUBMIT
 // =======================================================
 
 analyzeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const value = addressInput.value.trim();
-
-  if (!value || !value.startsWith("0x") || value.length < 20) {
+  if (!value.startsWith("0x") || value.length < 20) {
     showToast("Please enter a valid contract address.");
     return;
   }
@@ -149,58 +181,128 @@ analyzeForm.addEventListener("submit", async (e) => {
   showToast("Fetching data...");
 
   const token = await fetchTokenInfo(value);
-
-  if (token) {
-    showAnalyzeResult(token);
-  } else {
-    showToast("Token not found on ArcScan.");
+  if (!token) {
+    showToast("Token not found.");
+    return;
   }
 
+  showAnalyzeResult(token);
   smoothScrollTo(analyzeResultCard);
 });
 
 // =======================================================
-//  COPY BUTTON
+//  TABLE RENDERING (REAL DATA)
 // =======================================================
 
-copyAnalyzeAddressBtn.addEventListener("click", () => {
-  const addr = analyzeAddressEl.textContent.trim();
-  if (!addr) return;
-  copyToClipboard(addr, "Address copied");
-});
+function shortAddr(addr) {
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
+}
 
-// =======================================================
-//  TABLE (EMPTY FOR NOW — LIVE MODE DOESN'T USE STATIC LIST)
-// =======================================================
+function createStatusPill(status) {
+  const span = document.createElement("span");
+  span.classList.add("status-pill");
+
+  if (status === "trusted") {
+    span.classList.add("status-trusted");
+    span.textContent = "Trusted";
+  } else if (status === "risky") {
+    span.classList.add("status-risky");
+    span.textContent = "Risky";
+  } else {
+    span.classList.add("status-unknown");
+    span.textContent = "Unknown";
+  }
+
+  return span;
+}
 
 function renderTable() {
   tableBody.innerHTML = "";
 
-  const trEmpty = document.createElement("tr");
-  const tdEmpty = document.createElement("td");
-  tdEmpty.colSpan = 5;
-  tdEmpty.textContent = "Token list disabled (using live API mode).";
-  tdEmpty.style.color = "var(--text-muted)";
-  tdEmpty.style.padding = "14px 10px";
-  trEmpty.appendChild(tdEmpty);
+  const filtered = LIVE_TOKENS.filter((t) =>
+    currentFilter === "all" ? true : t.status === currentFilter
+  );
 
-  tableBody.appendChild(trEmpty);
+  if (filtered.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 5;
+    td.textContent = "No tokens match this filter.";
+    td.style.color = "var(--text-muted)";
+    td.style.padding = "14px 10px";
+    tr.appendChild(td);
+    tableBody.appendChild(tr);
+    return;
+  }
+
+  filtered.forEach((token) => {
+    const tr = document.createElement("tr");
+
+    // Token name
+    const tdToken = document.createElement("td");
+    tdToken.innerHTML = `
+      <span class="token-name">${token.name}</span>
+      <span class="token-symbol">${token.symbol}</span>
+    `;
+
+    // Address
+    const tdAddress = document.createElement("td");
+    tdAddress.innerHTML = `<span class="token-address">${shortAddr(token.address)}</span>`;
+
+    // Holders
+    const tdHolders = document.createElement("td");
+    tdHolders.textContent = token.holders;
+
+    // Status
+    const tdStatus = document.createElement("td");
+    tdStatus.appendChild(createStatusPill(token.status));
+
+    // Actions
+    const tdActions = document.createElement("td");
+    tdActions.className = "col-actions";
+
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn-ghost";
+    viewBtn.textContent = "View";
+    viewBtn.onclick = () => {
+      showAnalyzeResult(token);
+      smoothScrollTo(analyzeResultCard);
+    };
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "btn-ghost btn-copy";
+    copyBtn.textContent = "Copy";
+    copyBtn.onclick = () => copyToClipboard(token.address, "Address copied");
+
+    tdActions.appendChild(viewBtn);
+    tdActions.appendChild(copyBtn);
+
+    tr.appendChild(tdToken);
+    tr.appendChild(tdAddress);
+    tr.appendChild(tdHolders);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
+
+    tableBody.appendChild(tr);
+  });
 }
 
 // =======================================================
-//  FILTER BUTTONS (STILL WORK, JUST DISABLED LIST)
+//  FILTER BUTTONS
 // =======================================================
 
 filterButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     filterButtons.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
+
+    currentFilter = btn.dataset.filter;
     renderTable();
   });
 });
 
 // =======================================================
-//  Utils – toast, scroll, clipboard
+//  TOAST + UTILS
 // =======================================================
 
 function showToast(message) {
@@ -214,20 +316,24 @@ function showToast(message) {
 }
 
 function copyToClipboard(text, msg) {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => showToast(msg || "Copied"))
-    .catch(() => showToast("Failed to copy"));
+  navigator.clipboard.writeText(text).then(
+    () => showToast(msg),
+    () => showToast("Failed to copy")
+  );
 }
 
 function smoothScrollTo(elem) {
-  if (!elem) return;
   const rect = elem.getBoundingClientRect();
   const absoluteTop = window.scrollY + rect.top - 80;
   window.scrollTo({ top: absoluteTop, behavior: "smooth" });
 }
 
 // =======================================================
-//  Init
+//  INIT – LOAD TOKEN LIST
 // =======================================================
-renderTable();
+
+(async function init() {
+  showToast("Loading tokens...");
+  LIVE_TOKENS = await fetchTokenList();
+  renderTable();
+})();
