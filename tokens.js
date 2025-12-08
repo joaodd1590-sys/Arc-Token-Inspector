@@ -1,40 +1,6 @@
 // =======================================================
-//  Arc Token Inspector – Frontend Logic
+//  Arc Token Inspector – LIVE VERSION (ArcScan API)
 // =======================================================
-
-// Mock token list for Arc Testnet.
-// In the future you can swap this for live data from ArcScan / Blockscout.
-const TOKENS = [
-  {
-    id: "usdc-test",
-    name: "USD Coin (Test)",
-    symbol: "USDC",
-    address: "0xMockUSDC00000000000000000000000000000001",
-    holders: 420,
-    status: "trusted",
-    notes: "Circle-style test USDC on Arc Testnet. Used for most gas & fee examples."
-  },
-  {
-    id: "memearc",
-    name: "MemeArc",
-    symbol: "MARC",
-    address: "0xMockMARC0000000000000000000000000000002",
-    holders: 7,
-    status: "unknown",
-    notes:
-      "Low holder count and short history. Could be harmless, could be a rug – do your own research."
-  },
-  {
-    id: "superyield",
-    name: "SuperYield 1000x",
-    symbol: "SYLD",
-    address: "0xMockSYLD0000000000000000000000000000003",
-    holders: 1,
-    status: "risky",
-    notes:
-      "Contract not verified and contains functions that may allow draining or freezing balances."
-  }
-];
 
 // DOM refs
 const tableBody = document.getElementById("tokenTableBody");
@@ -56,150 +22,100 @@ const toastEl = document.getElementById("toast");
 let currentFilter = "all";
 
 // =======================================================
-//  Rendering
+//  ARCSCAN LIVE TOKEN LOOKUP
 // =======================================================
-function createStatusPill(status) {
-  const span = document.createElement("span");
-  span.classList.add("status-pill");
 
-  if (status === "trusted") {
-    span.classList.add("status-trusted");
-    span.textContent = "Trusted";
-  } else if (status === "risky") {
-    span.classList.add("status-risky");
-    span.textContent = "Risky";
-  } else {
-    span.classList.add("status-unknown");
-    span.textContent = "Unknown";
-  }
+async function fetchTokenInfo(address) {
+  const base = "https://testnet.arcscan.app/api";
 
-  return span;
-}
+  try {
+    // 1) Fetch token metadata
+    const metaRes = await fetch(
+      `${base}?module=token&action=getToken&contractaddress=${address}`
+    );
+    const metaJson = await metaRes.json();
 
-function renderTable() {
-  tableBody.innerHTML = "";
+    if (!metaJson?.result) return null;
 
-  const tokens = TOKENS.filter((t) =>
-    currentFilter === "all" ? true : t.status === currentFilter
-  );
+    const token = metaJson.result;
 
-  tokens.forEach((token) => {
-    const tr = document.createElement("tr");
+    // 2) Fetch holders count
+    const holdersRes = await fetch(
+      `${base}?module=token&action=getTokenHolders&contractaddress=${address}`
+    );
+    const holdersJson = await holdersRes.json();
 
-    // Token col
-    const tdToken = document.createElement("td");
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "token-name";
-    nameSpan.textContent = token.name;
+    let holders = "?";
+    if (holdersJson?.result?.holders) {
+      holders = holdersJson.result.holders;
+    }
 
-    const symbolSpan = document.createElement("span");
-    symbolSpan.className = "token-symbol";
-    symbolSpan.textContent = token.symbol;
+    const risk = classifyRisk(token, holders);
 
-    tdToken.appendChild(nameSpan);
-    tdToken.appendChild(symbolSpan);
-
-    // Address col
-    const tdAddress = document.createElement("td");
-    const addrSpan = document.createElement("span");
-    addrSpan.className = "token-address";
-    addrSpan.textContent = shortAddr(token.address);
-    tdAddress.appendChild(addrSpan);
-
-    // Holders col
-    const tdHolders = document.createElement("td");
-    tdHolders.textContent = token.holders.toString();
-
-    // Status col
-    const tdStatus = document.createElement("td");
-    tdStatus.appendChild(createStatusPill(token.status));
-
-    // Actions col
-    const tdActions = document.createElement("td");
-    tdActions.className = "col-actions";
-
-    const viewBtn = document.createElement("button");
-    viewBtn.type = "button";
-    viewBtn.className = "btn-ghost";
-    viewBtn.textContent = "View";
-    viewBtn.addEventListener("click", () => {
-      showAnalyzeResult(token);
-      smoothScrollTo(analyzeResultCard);
-    });
-
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "btn-ghost btn-copy";
-    copyBtn.textContent = "Copy";
-    copyBtn.addEventListener("click", () => {
-      copyToClipboard(token.address, "Token address copied");
-    });
-
-    tdActions.appendChild(viewBtn);
-    tdActions.appendChild(copyBtn);
-
-    tr.appendChild(tdToken);
-    tr.appendChild(tdAddress);
-    tr.appendChild(tdHolders);
-    tr.appendChild(tdStatus);
-    tr.appendChild(tdActions);
-
-    tableBody.appendChild(tr);
-  });
-
-  if (tokens.length === 0) {
-    const trEmpty = document.createElement("tr");
-    const tdEmpty = document.createElement("td");
-    tdEmpty.colSpan = 5;
-    tdEmpty.textContent = "No tokens for this filter.";
-    tdEmpty.style.color = "var(--text-muted)";
-    tdEmpty.style.padding = "14px 10px";
-    trEmpty.appendChild(tdEmpty);
-    tableBody.appendChild(trEmpty);
+    return {
+      name: token.name || "Unknown",
+      symbol: token.symbol || "???",
+      address: address,
+      holders: holders,
+      decimals: token.decimals ?? "?",
+      totalSupply: token.totalSupply ?? "?",
+      verified: token.verified === "true",
+      status: risk.status,
+      notes: risk.notes
+    };
+  } catch (err) {
+    console.error("ERROR fetching token:", err);
+    return null;
   }
 }
 
-// helper for shortening addresses
-function shortAddr(addr) {
-  if (!addr || addr.length < 10) return addr || "--";
-  return addr.slice(0, 6) + "..." + addr.slice(-4);
-}
-
 // =======================================================
-//  Analyze by address
+//  RISK ANALYSIS
 // =======================================================
 
-function findTokenByAddress(address) {
-  if (!address) return null;
-  const normalized = address.trim().toLowerCase();
-  return TOKENS.find((t) => t.address.toLowerCase() === normalized) || null;
-}
-
-// Basic mock classification for addresses not in TOKENS
-function classifyUnknownAddress(address) {
-  // very naive heuristics for the demo:
-  // if address ends with many zeros -> risky (could be proxy or weird)
-  const lastFour = address.slice(-4);
-  let status = "unknown";
-  let holders = "?";
-  let notes =
-    "This contract is not in the curated list. No risk data is available – treat as unknown.";
-
-  if (/^0{3,4}$/g.test(lastFour)) {
-    status = "risky";
-    notes =
-      "The address pattern looks unusual and this contract is not in the curated list. Treat as risky.";
+function classifyRisk(token, holders) {
+  // RULE 1: Verified contract + good holder count → trusted
+  if (token.verified === "true" && holders > 50) {
+    return {
+      status: "trusted",
+      notes: "Verified contract with healthy number of holders."
+    };
   }
 
-  return { status, holders, notes };
+  // RULE 2: Very low holders → risky
+  if (Number(holders) <= 3) {
+    return {
+      status: "risky",
+      notes: "Very few holders — high rug risk. DYOR."
+    };
+  }
+
+  // RULE 3: Unverified → unknown
+  if (token.verified !== "true") {
+    return {
+      status: "unknown",
+      notes: "Unverified contract — review before interacting."
+    };
+  }
+
+  return {
+    status: "unknown",
+    notes: "Insufficient data — proceed with caution."
+  };
 }
+
+// =======================================================
+//  Analyze result renderer
+// =======================================================
 
 function showAnalyzeResult(tokenLike) {
   analyzeHint.classList.add("hidden");
   analyzeResultCard.classList.remove("hidden");
 
   analyzeNameEl.textContent = `${tokenLike.name} (${tokenLike.symbol})`;
-  analyzeStatusEl.className = "status-pill"; // reset classes
+
+  // Reset pill
+  analyzeStatusEl.className = "status-pill";
   if (tokenLike.status === "trusted") {
     analyzeStatusEl.classList.add("status-trusted");
     analyzeStatusEl.textContent = "Trusted";
@@ -216,35 +132,37 @@ function showAnalyzeResult(tokenLike) {
   analyzeNotesEl.textContent = tokenLike.notes || "No additional notes.";
 }
 
-analyzeForm.addEventListener("submit", (e) => {
+// =======================================================
+//  Form submission (real API mode)
+// =======================================================
+
+analyzeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const value = addressInput.value.trim();
 
   if (!value || !value.startsWith("0x") || value.length < 20) {
-    showToast("Please enter a valid token contract address (0x...)");
+    showToast("Please enter a valid contract address.");
     return;
   }
 
-  const known = findTokenByAddress(value);
-  if (known) {
-    showAnalyzeResult(known);
+  showToast("Fetching data...");
+
+  const token = await fetchTokenInfo(value);
+
+  if (token) {
+    showAnalyzeResult(token);
   } else {
-    const { status, holders, notes } = classifyUnknownAddress(value);
-    const pseudoToken = {
-      name: "Unknown token",
-      symbol: "???",
-      address: value,
-      holders,
-      status,
-      notes
-    };
-    showAnalyzeResult(pseudoToken);
+    showToast("Token not found on ArcScan.");
   }
 
   smoothScrollTo(analyzeResultCard);
 });
 
-// Copy from result card
+// =======================================================
+//  COPY BUTTON
+// =======================================================
+
 copyAnalyzeAddressBtn.addEventListener("click", () => {
   const addr = analyzeAddressEl.textContent.trim();
   if (!addr) return;
@@ -252,16 +170,31 @@ copyAnalyzeAddressBtn.addEventListener("click", () => {
 });
 
 // =======================================================
-//  Filters
+//  TABLE (EMPTY FOR NOW — LIVE MODE DOESN'T USE STATIC LIST)
 // =======================================================
+
+function renderTable() {
+  tableBody.innerHTML = "";
+
+  const trEmpty = document.createElement("tr");
+  const tdEmpty = document.createElement("td");
+  tdEmpty.colSpan = 5;
+  tdEmpty.textContent = "Token list disabled (using live API mode).";
+  tdEmpty.style.color = "var(--text-muted)";
+  tdEmpty.style.padding = "14px 10px";
+  trEmpty.appendChild(tdEmpty);
+
+  tableBody.appendChild(trEmpty);
+}
+
+// =======================================================
+//  FILTER BUTTONS (STILL WORK, JUST DISABLED LIST)
+// =======================================================
+
 filterButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
-    const filter = btn.getAttribute("data-filter");
-    currentFilter = filter;
-
     filterButtons.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-
     renderTable();
   });
 });
@@ -269,6 +202,7 @@ filterButtons.forEach((btn) => {
 // =======================================================
 //  Utils – toast, scroll, clipboard
 // =======================================================
+
 function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.remove("hidden");
