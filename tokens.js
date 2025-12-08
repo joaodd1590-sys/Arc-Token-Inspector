@@ -1,602 +1,261 @@
-// Network configuration (future-proof for mainnet)
-const NETWORKS = {
-  arcTestnet: {
-    label: "ARC Testnet",
-    explorerBase: "https://testnet.arcscan.app"
-  },
-  arcMainnet: {
-    label: "ARC Mainnet",
-    explorerBase: "https://arcscan.app"
-  }
-};
-
-// Known trusted tokens on ARC
+// Known trusted tokens
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
     note: "Official USDC on ARC Testnet",
-    refSupply: "1000000000000000"
-  }
+  },
 };
 
-// Chart instances
-let riskPieChart = null;
-let riskBarChart = null;
-let riskLineChart = null;
-let supplyBarChart = null;
-
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("analyzeBtn");
-  const themeToggle = document.getElementById("themeToggle");
-  const copyBtn = document.getElementById("copyAddressBtn");
-
-  btn.addEventListener("click", handleAnalyze);
   document
-    .getElementById("tokenAddress")
-    .addEventListener("keyup", (e) => {
-      if (e.key === "Enter") handleAnalyze();
+    .querySelector(".network-tab.locked")
+    .addEventListener("click", (e) => {
+      e.preventDefault();
+      alert("Mainnet soon — not available yet.");
     });
 
-  initThemeToggle(themeToggle);
-  initCopyButton(copyBtn);
+  document.getElementById("analyzeBtn").addEventListener("click", loadToken);
 });
 
-function initThemeToggle(button) {
-  const body = document.body;
-  const saved = localStorage.getItem("arc-theme");
-  if (saved === "light" || saved === "dark") {
-    body.setAttribute("data-theme", saved);
-  }
-  updateThemeIcon(button);
+// GLOBAL CHART INSTANCES
+let pieChart = null;
+let barChart = null;
+let scoreChart = null;
 
-  button.addEventListener("click", () => {
-    const current = body.getAttribute("data-theme") || "dark";
-    const next = current === "dark" ? "light" : "dark";
-    body.setAttribute("data-theme", next);
-    localStorage.setItem("arc-theme", next);
-    updateThemeIcon(button);
-  });
-}
-
-function updateThemeIcon(button) {
-  const body = document.body;
-  const current = body.getAttribute("data-theme") || "dark";
-  button.textContent = current === "dark" ? "🌙" : "☀️";
-}
-
-function initCopyButton(copyBtn) {
-  copyBtn.addEventListener("click", async () => {
-    const addrShort = document.getElementById("tokenAddressShort").dataset.full;
-    if (!addrShort) return;
-    try {
-      await navigator.clipboard.writeText(addrShort);
-      copyBtn.classList.add("copied");
-      copyBtn.textContent = "✔ Copied";
-      setTimeout(() => {
-        copyBtn.classList.remove("copied");
-        copyBtn.textContent = "📋 Copy";
-      }, 1200);
-    } catch (e) {
-      console.error("Clipboard error", e);
-    }
-  });
-}
-
-async function handleAnalyze() {
-  const input = document.getElementById("tokenAddress");
-  const address = (input.value || "").trim();
-
-  if (!address || !address.startsWith("0x") || address.length < 10) {
-    alert("Please enter a valid token contract address (0x...).");
+async function loadToken() {
+  const address = document.getElementById("tokenAddress").value.trim();
+  if (!address.startsWith("0x")) {
+    alert("Invalid address.");
     return;
   }
 
-  const networkKey = document.getElementById("networkSelect").value;
+  const status = document.getElementById("statusMsg");
+  status.textContent = "Loading…";
+
   const tokenCard = document.getElementById("tokenCard");
   const riskCard = document.getElementById("riskCard");
-  const chartsSection = document.getElementById("chartsSection");
-  const statusMsg = document.getElementById("statusMsg");
+  const charts = document.getElementById("chartsSection");
 
   tokenCard.classList.add("hidden");
   riskCard.classList.add("hidden");
-  chartsSection.classList.add("hidden");
-  statusMsg.textContent = "Loading token data from ARC public API...";
+  charts.classList.add("hidden");
 
   try {
-    // network param futuro: backend pode usar para trocar de endpoint
-    const resp = await fetch(
-      `/api/arc-token?address=${address}&network=${networkKey}`
-    );
-    const data = await resp.json();
+    const response = await fetch(`/api/arc-token?address=${address}`);
+    const data = await response.json();
 
-    if (!resp.ok || !data || !data.name) {
-      statusMsg.textContent = "Token not found or API returned an error.";
+    if (!data.name) {
+      status.textContent = "Token not found.";
       return;
     }
 
-    fillTokenInfo(address, data, networkKey);
+    status.textContent = "Token loaded.";
 
-    const riskResult = applyRiskSignal(address, data); // level + score + breakdown
-    updateChartsAndBreakdown(address, data, riskResult);
+    fillInfo(address, data);
+    const risk = computeRisk(address, data);
+    applyRisk(risk);
+
+    renderCharts(risk);
 
     tokenCard.classList.remove("hidden");
     riskCard.classList.remove("hidden");
-    chartsSection.classList.remove("hidden");
-    statusMsg.textContent =
-      "Token loaded successfully. Always cross-check with the official explorer.";
+    charts.classList.remove("hidden");
   } catch (err) {
-    console.error(err);
-    statusMsg.textContent = "Failed to load token data.";
+    status.textContent = "Error loading token.";
   }
 }
 
-function fillTokenInfo(address, token, networkKey) {
-  const titleEl = document.getElementById("tokenTitle");
-  const addrShortEl = document.getElementById("tokenAddressShort");
-  const avatarEl = document.getElementById("tokenAvatar");
-  const explorerLink = document.getElementById("explorerLink");
+function fillInfo(address, token) {
+  document.getElementById("tName").textContent = token.name;
+  document.getElementById("tSymbol").textContent = token.symbol;
+  document.getElementById("tDecimals").textContent = token.decimals;
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply;
 
-  document.getElementById("tName").textContent = token.name || "-";
-  document.getElementById("tSymbol").textContent = token.symbol || "-";
-  document.getElementById("tDecimals").textContent =
-    token.decimals ?? "unknown";
-  document.getElementById("tSupplyRaw").textContent =
-    token.totalSupply || "-";
+  const big = BigInt(token.totalSupply);
+  const dec = BigInt(token.decimals);
+  const human = big / 10n ** dec;
 
-  const human = formatHumanSupply(token.totalSupply, token.decimals);
-  document.getElementById("tSupplyHuman").textContent = human;
+  document.getElementById("tSupplyHuman").textContent =
+    human.toLocaleString("en-US");
 
-  titleEl.textContent = `${token.name || "Token"} (${token.symbol || "?"})`;
-  const shortAddr = shortenAddress(address);
-  addrShortEl.textContent = shortAddr;
-  addrShortEl.dataset.full = address;
+  document.getElementById("tokenTitle").textContent =
+    `${token.name} (${token.symbol})`;
 
-  const network = NETWORKS[networkKey] || NETWORKS.arcTestnet;
-  explorerLink.href = `${network.explorerBase}/token/${address}`;
+  document.getElementById("tokenAddressShort").textContent =
+    address.slice(0, 6) + "..." + address.slice(-4);
 
-  const label =
-    (token.symbol && token.symbol[0]) ||
-    (token.name && token.name[0]) ||
-    "?";
-
-  avatarEl.textContent = label.toUpperCase();
+  document.getElementById("tokenAvatar").textContent =
+    token.symbol[0].toUpperCase();
 }
 
-function shortenAddress(addr) {
-  if (!addr || addr.length < 10) return addr;
-  return addr.slice(0, 6) + "..." + addr.slice(-4);
-}
+// ADVANCED RISK SYSTEM
+function computeRisk(address, token) {
+  let labels = [];
+  let values = [];
+  let cumulative = [];
 
-function formatHumanSupply(raw, decimals) {
-  if (!raw) return "-";
-  try {
-    const d = Number(decimals || 0);
-    const big = BigInt(raw);
-    if (d <= 0) return big.toLocaleString("en-US");
+  let score = 0;
+  const push = (label, value) => {
+    score += value;
+    labels.push(label);
+    values.push(value);
+    cumulative.push(score);
+  };
 
-    const factor = BigInt(10) ** BigInt(d);
-    const intPart = big / factor;
-    const fracPart = big % factor;
-
-    let fracStr = fracPart.toString().padStart(d, "0");
-    fracStr = fracStr.slice(0, 4);
-
-    return `${intPart.toLocaleString("en-US")}.${fracStr}`;
-  } catch (e) {
-    return raw;
-  }
-}
-
-/* ---------------------------------------
-   RISK ENGINE + ICONS + GLOW + BREAKDOWN
----------------------------------------- */
-
-function applyRiskSignal(address, token) {
-  const normalized = address.toLowerCase();
-  const trusted = TRUSTED_TOKENS[normalized];
-
-  const riskPill = document.getElementById("riskPill");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDesc = document.getElementById("riskDescription");
-  const verifiedBadge = document.getElementById("verifiedBadge");
-
-  // reset
-  riskPill.className = "risk-pill";
-  verifiedBadge.classList.add("hidden");
-
-  const breakdown = [];
-  let totalScore = 0;
-
-  /* ========= TRUSTED (LISTA) ========= */
-  if (trusted) {
-    riskPill.textContent = "🟢 Trusted";
-    riskPill.classList.add("risk-safe");
-    verifiedBadge.classList.remove("hidden");
-
-    riskTitle.textContent = `${token.symbol || "Token"} is marked as trusted.`;
-    riskDesc.textContent =
-      trusted.note +
-      " · Still, always verify URLs, contracts and documentation.";
-
-    breakdown.push({
-      label: "Trusted list",
-      score: 0,
-      icon: "🟢",
-      reason: "This contract is explicitly allowlisted as an official token."
-    });
-
+  // Trusted list
+  if (TRUSTED_TOKENS[address.toLowerCase()]) {
     return {
       level: "safe",
-      totalScore,
-      breakdown
+      levelIndex: 0,
+      labels: ["Trusted token"],
+      values: [0],
+      cumulative: [0],
+      total: 0,
     };
   }
 
-  // --------- DECIMALS ----------
-  let decimalsScore = 0;
-  const decimals = Number(token.decimals || 0);
-  if (decimals > 18 || decimals === 0) {
-    decimalsScore += 2;
-  }
-  breakdown.push({
-    label: "Decimals",
-    score: decimalsScore,
-    icon: decimalsScore ? "⚠️" : "✅",
-    reason:
-      decimals === 0
-        ? "Token has 0 decimals — unusual for most mainstream ERC-20 tokens."
-        : decimals > 18
-        ? "Token uses very high decimals — can be used to mislead users."
-        : "Decimals in a typical range."
-  });
-  totalScore += decimalsScore;
+  // DECIMALS
+  push("Decimals", token.decimals === 0 || token.decimals > 18 ? 2 : 0);
 
-  // --------- NAME / SYMBOL ----------
-  let nameSymbolScore = 0;
-  const name = token.name || "";
-  const symbol = token.symbol || "";
+  // NAME / SYMBOL
+  push(
+    "Name / Symbol",
+    token.symbol.length < 2 || token.symbol.length > 8 ? 1 : 0
+  );
 
-  if (!name || name.length < 3) nameSymbolScore += 1;
-  if (!symbol || symbol.length < 2 || symbol.length > 8) nameSymbolScore += 1;
+  // IMPERSONATION
+  push(
+    "Impersonation",
+    ["USDC", "USDT", "ETH"].includes(token.symbol.toUpperCase()) ? 2 : 0
+  );
 
-  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "BNB", "ARB", "MATIC"];
-  let impersonationScore = 0;
-  if (famousSymbols.includes(symbol.toUpperCase()) && !TRUSTED_TOKENS[normalized]) {
-    impersonationScore += 3;
-  }
+  // SUPPLY
+  const supply = BigInt(token.totalSupply);
+  push("Total supply", supply === 0n ? 2 : supply > 10n ** 40n ? 2 : 0);
 
-  breakdown.push({
-    label: "Name / Symbol",
-    score: nameSymbolScore,
-    icon: nameSymbolScore ? "⚠️" : "✅",
-    reason:
-      nameSymbolScore > 0
-        ? "Name or symbol length looks unusual for a production token."
-        : "Name and symbol look reasonably structured."
-  });
+  // ADDRESS PATTERN
+  push("Address pattern", address.startsWith("0x000000") ? 2 : 0);
 
-  breakdown.push({
-    label: "Impersonation",
-    score: impersonationScore,
-    icon: impersonationScore ? "🚩" : "✅",
-    reason:
-      impersonationScore > 0
-        ? `Symbol matches a well-known asset (${symbol}) but contract is not allowlisted — possible impersonation.`
-        : "No obvious symbol impersonation detected."
-  });
+  // CONTRACT VERIFIED (placeholder)
+  push("Contract verification", 1);
 
-  totalScore += nameSymbolScore + impersonationScore;
+  // HONEYPOT CHECK (placeholder)
+  push("Honeypot checks", 1);
 
-  // --------- SUPPLY ----------
-  let supplyScore = 0;
-  const supplyStr = token.totalSupply || "0";
-  let supply = 0n;
-  try {
-    supply = BigInt(supplyStr);
-  } catch {}
+  // CREATION AGE (placeholder)
+  push("Creation age", 1);
 
-  if (supply === 0n) supplyScore += 2;
-  if (supply > 10n ** 40n) supplyScore += 2;
-
-  breakdown.push({
-    label: "Total supply",
-    score: supplyScore,
-    icon: supplyScore ? "⚠️" : "✅",
-    reason:
-      supply === 0n
-        ? "Total supply is zero — token may be defunct or misconfigured."
-        : supply > 10n ** 40n
-        ? "Extremely large supply — often used in low-quality or spam tokens."
-        : "Supply looks within a normal range for ERC-20 style assets."
-  });
-  totalScore += supplyScore;
-
-  // --------- ADDRESS PATTERN ----------
-  let addrScore = 0;
-  if (normalized.startsWith("0x000000")) addrScore += 2;
-
-  breakdown.push({
-    label: "Address pattern",
-    score: addrScore,
-    icon: addrScore ? "⚠️" : "✅",
-    reason:
-      addrScore > 0
-        ? "Contract address starts with many zeros — this can be generated to look 'special' and mislead."
-        : "Contract address pattern is not inherently suspicious."
-  });
-  totalScore += addrScore;
-
-  // --------- ABI / VERIFICATION (placeholder testnet) ----------
-  const abiScore = 0;
-  breakdown.push({
-    label: "Contract verification",
-    score: abiScore,
-    icon: "ℹ️",
-    reason:
-      "Verification status is not available on this testnet endpoint. On mainnet, a non-verified contract would be a strong red flag."
-  });
-
-  // --------- HONEYPOT (placeholder) ----------
-  const honeypotScore = 0;
-  breakdown.push({
-    label: "Honeypot checks",
-    score: honeypotScore,
-    icon: "ℹ️",
-    reason:
-      "Static honeypot analysis (buy/sell simulation, blacklist checks) is not enabled on this testnet version."
-  });
-
-  // --------- CREATION TIME (placeholder) ----------
-  const creationScore = 0;
-  breakdown.push({
-    label: "Creation age",
-    score: creationScore,
-    icon: "ℹ️",
-    reason:
-      "Creation block / age data is not exposed by this API on testnet. On mainnet, extremely new contracts are usually higher risk."
-  });
-
-  totalScore += abiScore + honeypotScore + creationScore;
-
-  // --------- SCORE → LEVEL ----------
+  const total = score;
   let level = "safe";
-  if (totalScore >= 8) level = "danger";
-  else if (totalScore >= 4) level = "warning";
-  else if (totalScore >= 1) level = "caution";
+  let levelIndex = 0;
 
-  if (level === "safe") {
-    riskPill.textContent = "🟢 Likely Safe";
-    riskPill.classList.add("risk-safe");
-    riskTitle.textContent = "No major heuristic red flags detected.";
-    riskDesc.textContent =
-      "This does NOT guarantee safety — it only means basic structural checks did not find severe issues. Always do your own research.";
-  } else if (level === "caution") {
-    riskPill.textContent = "⚠️ Caution";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Minor suspicious characteristics detected.";
-    riskDesc.textContent =
-      "Some aspects (decimals, naming or supply) look slightly unusual. Review this contract carefully before interacting.";
-  } else if (level === "warning") {
-    riskPill.textContent = "⚠️ Risky";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Several heuristic red flags were found.";
-    riskDesc.textContent =
-      "The token's configuration suggests higher-than-normal risk. Interact only if you fully understand the project.";
-  } else {
-    riskPill.textContent = "🔥 High Risk";
-    riskPill.classList.add("risk-danger", "glow-danger");
-    riskTitle.textContent = "Strong red flags — avoid this token.";
-    riskDesc.textContent =
-      "Based on decimals, supply, naming and address pattern, this token looks extremely risky. Avoid interacting.";
+  if (total >= 8) {
+    level = "danger";
+    levelIndex = 3;
+  } else if (total >= 5) {
+    level = "warning";
+    levelIndex = 2;
+  } else if (total >= 2) {
+    level = "caution";
+    levelIndex = 1;
   }
 
-  return {
-    level,
-    totalScore,
-    breakdown
-  };
+  return { labels, values, cumulative, total, level, levelIndex };
 }
 
-/* ---------------------------------------
-   CHARTS + BREAKDOWN RENDER
----------------------------------------- */
+// APPLY RISK TO UI
+function applyRisk(risk) {
+  const pill = document.getElementById("riskPill");
+  const badge = document.getElementById("verifiedBadge");
 
-function updateChartsAndBreakdown(address, token, riskResult) {
-  const { level, totalScore, breakdown } = riskResult;
+  pill.className = "risk-pill";
 
-  // PIE
-  const levelData = {
-    safe: level === "safe" ? 1 : 0,
-    caution: level === "caution" ? 1 : 0,
-    warning: level === "warning" ? 1 : 0,
-    danger: level === "danger" ? 1 : 0
-  };
+  if (risk.level === "safe") {
+    pill.textContent = "Likely Safe";
+    pill.classList.add("risk-safe");
+    badge.classList.add("hidden");
+  } else if (risk.level === "caution") {
+    pill.textContent = "Caution";
+    pill.classList.add("risk-warning");
+    badge.classList.add("hidden");
+  } else if (risk.level === "warning") {
+    pill.textContent = "Risky";
+    pill.classList.add("risk-warning");
+    badge.classList.add("hidden");
+  } else {
+    pill.textContent = "High Risk";
+    pill.classList.add("risk-danger");
+    badge.classList.add("hidden");
+  }
 
-  const ctxPie = document.getElementById("riskPieChart");
-  if (riskPieChart) riskPieChart.destroy();
-  riskPieChart = new Chart(ctxPie, {
+  document.querySelector(".risk-title").textContent =
+    risk.level === "safe"
+      ? "No major red flags detected."
+      : `Detected risk level: ${risk.level.toUpperCase()}`;
+
+  document.querySelector(".risk-description").textContent =
+    `Total heuristic score: ${risk.total}`;
+}
+
+// CHARTS
+function renderCharts(risk) {
+  const ctxPie = document.getElementById("riskPie").getContext("2d");
+  const ctxBars = document.getElementById("riskBars").getContext("2d");
+  const ctxScore = document.getElementById("scoreProgress").getContext("2d");
+
+  // Destroy old charts
+  if (pieChart) pieChart.destroy();
+  if (barChart) barChart.destroy();
+  if (scoreChart) scoreChart.destroy();
+
+  const pieData = [0, 0, 0, 0];
+  pieData[risk.levelIndex] = 1;
+
+  pieChart = new Chart(ctxPie, {
     type: "pie",
     data: {
-      labels: ["Safe", "Caution", "Risky", "High risk"],
+      labels: ["Safe", "Caution", "Risky", "High Risk"],
       datasets: [
         {
-          data: [
-            levelData.safe,
-            levelData.caution,
-            levelData.warning,
-            levelData.danger
-          ],
-          backgroundColor: [
-            "rgba(34,197,94,0.8)",
-            "rgba(252,211,77,0.9)",
-            "rgba(249,115,22,0.9)",
-            "rgba(248,113,113,0.9)"
-          ]
-        }
-      ]
+          data: pieData,
+          backgroundColor: ["#22c55e", "#facc15", "#fb923c", "#ef4444"],
+        },
+      ],
     },
-    options: {
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { color: "#e5e7eb", boxWidth: 14, font: { size: 11 } }
-        }
-      }
-    }
+    options: { responsive: true },
   });
 
-  // BAR: breakdown
-  const labels = breakdown.map((b) => b.label);
-  const scores = breakdown.map((b) => b.score);
-
-  const ctxBar = document.getElementById("riskBarChart");
-  if (riskBarChart) riskBarChart.destroy();
-  riskBarChart = new Chart(ctxBar, {
+  barChart = new Chart(ctxBars, {
     type: "bar",
     data: {
-      labels,
+      labels: risk.labels,
       datasets: [
         {
           label: "Score",
-          data: scores,
-          backgroundColor: "rgba(59,130,246,0.8)"
-        }
-      ]
+          data: risk.values,
+          backgroundColor: "#3b82f6",
+        },
+      ],
     },
     options: {
-      scales: {
-        x: {
-          ticks: { color: "#e5e7eb", font: { size: 10 } }
-        },
-        y: {
-          ticks: { color: "#e5e7eb", stepSize: 1 },
-          beginAtZero: true
-        }
-      },
-      plugins: {
-        legend: {
-          labels: { color: "#e5e7eb" }
-        }
-      }
-    }
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 3 } },
+    },
   });
 
-  // LINE: cumulative
-  let cumulative = 0;
-  const cumData = breakdown.map((b) => {
-    cumulative += b.score;
-    return cumulative;
-  });
-
-  const ctxLine = document.getElementById("riskLineChart");
-  if (riskLineChart) riskLineChart.destroy();
-  riskLineChart = new Chart(ctxLine, {
+  scoreChart = new Chart(ctxScore, {
     type: "line",
     data: {
-      labels,
+      labels: risk.labels,
       datasets: [
         {
-          label: "Cumulative risk score",
-          data: cumData,
-          borderColor: "rgba(249,115,22,0.9)",
-          borderWidth: 2,
-          tension: 0.25,
-          pointRadius: 3
-        }
-      ]
+          label: "Cumulative score",
+          data: risk.cumulative,
+          borderColor: "#fb923c",
+          backgroundColor: "rgba(251,146,60,0.25)",
+        },
+      ],
     },
-    options: {
-      scales: {
-        x: { ticks: { color: "#e5e7eb", font: { size: 10 } } },
-        y: {
-          ticks: { color: "#e5e7eb", stepSize: 1 },
-          beginAtZero: true
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#e5e7eb" } }
-      }
-    }
+    options: { responsive: true, tension: 0.3 },
   });
-
-  // SUPPLY comparison
-  const ctxSupply = document.getElementById("supplyBarChart");
-  if (supplyBarChart) supplyBarChart.destroy();
-
-  const normalized = address.toLowerCase();
-  const trusted = TRUSTED_TOKENS[normalized];
-  let thisSupply = 0;
-  let usdcSupply = 0;
-
-  try {
-    thisSupply = Number(token.totalSupply || "0");
-  } catch {}
-
-  if (trusted && trusted.refSupply) {
-    try {
-      usdcSupply = Number(trusted.refSupply);
-    } catch {}
-  } else {
-    try {
-      usdcSupply = Number(
-        TRUSTED_TOKENS["0x3600000000000000000000000000000000000000"].refSupply
-      );
-    } catch {}
-  }
-
-  const norm = (n) => (n === 0 ? 0 : Math.log10(n + 1));
-
-  supplyBarChart = new Chart(ctxSupply, {
-    type: "bar",
-    data: {
-      labels: ["This token", "USDC (ref)"],
-      datasets: [
-        {
-          data: [norm(thisSupply), norm(usdcSupply)],
-          backgroundColor: ["rgba(96,165,250,0.9)", "rgba(16,185,129,0.9)"]
-        }
-      ]
-    },
-    options: {
-      scales: {
-        x: { ticks: { color: "#e5e7eb" } },
-        y: {
-          ticks: { color: "#e5e7eb" },
-          beginAtZero: true
-        }
-      },
-      plugins: {
-        legend: { display: false }
-      }
-    }
-  });
-
-  renderRiskBreakdown(level, totalScore, breakdown);
-}
-
-function renderRiskBreakdown(level, totalScore, breakdown) {
-  const container = document.getElementById("riskBreakdown");
-
-  let levelLabel =
-    level === "safe"
-      ? "Likely Safe"
-      : level === "caution"
-      ? "Caution"
-      : level === "warning"
-      ? "Risky"
-      : "High Risk";
-
-  const html = [
-    `<h3>Why this rating? (${levelLabel}, score ${totalScore})</h3>`,
-    "<ul>",
-    ...breakdown.map(
-      (b) =>
-        `<li>${b.icon} <strong>${b.label}:</strong> ${b.reason} ${
-          b.score ? `(score +${b.score})` : ""
-        }</li>`
-    ),
-    "</ul>"
-  ].join("");
-
-  container.innerHTML = html;
 }
