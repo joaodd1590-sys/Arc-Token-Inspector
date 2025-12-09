@@ -1,91 +1,116 @@
-// Simple ARC Token Inspector logic
-// All checks here are heuristic only – never trust a single signal.
-
-/* -----------------------------
-   1. Known trusted tokens list
-   ----------------------------- */
-
-const TRUSTED_TOKENS = {
-  // Official USDC on ARC Testnet
-  "0x3600000000000000000000000000000000000000": {
-    label: "USDC",
-    note: "Official USDC on ARC Testnet"
+// Network configuration (I only enable Testnet for now. Mainnet will be opened later.)
+const NETWORKS = {
+  arcTestnet: {
+    label: "ARC Testnet",
+    explorerBase: "https://testnet.arcscan.app"
+  },
+  arcMainnet: {
+    label: "ARC Mainnet",
+    explorerBase: "https://arcscan.app"
   }
 };
 
-/* -----------------------------
-   2. Bootstrapping
-   ----------------------------- */
+// Trusted tokens list (manual allowlist for known official contracts)
+const TRUSTED_TOKENS = {
+  "0x3600000000000000000000000000000000000000": {
+    label: "USDC",
+    note: "Official USDC on ARC Testnet",
+    // optional reference supply for comparisons
+    refSupply: "25245628768486750"
+  }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("analyzeBtn");
-  btn.addEventListener("click", handleAnalyze);
-
-  const input = document.getElementById("tokenAddress");
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      handleAnalyze();
-    }
+  document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
+  document.getElementById("tokenAddress").addEventListener("keyup", (e) => {
+    if (e.key === "Enter") handleAnalyze();
   });
+
+  initThemeToggle();
+  initCopy();
 });
 
-/* -----------------------------
-   3. Main analyze handler
-   ----------------------------- */
+/* -------------------------
+   Theme switch (dark/light)
+--------------------------*/
+function initThemeToggle() {
+  const btn = document.getElementById("themeToggle");
+  const body = document.body;
 
+  btn.addEventListener("click", () => {
+    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    body.setAttribute("data-theme", next);
+    btn.textContent = next === "dark" ? "🌙" : "☀️";
+  });
+}
+
+/* -------------------------
+   Copy full contract address
+--------------------------*/
+function initCopy() {
+  const btn = document.getElementById("copyAddressBtn");
+  btn.addEventListener("click", async () => {
+    const full = document.getElementById("tokenAddressShort").dataset.full;
+    if (!full) return;
+
+    try {
+      await navigator.clipboard.writeText(full);
+      btn.textContent = "✔ Copied";
+      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
+    } catch {
+      btn.textContent = "Error";
+      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
+    }
+  });
+}
+
+/* -------------------------
+   Main "Analyze" handler
+--------------------------*/
 async function handleAnalyze() {
-  const input = document.getElementById("tokenAddress");
-  const address = (input.value || "").trim();
-
-  if (!address || !address.startsWith("0x") || address.length < 10) {
-    alert("Please paste a valid ARC-20 contract address (0x...).");
+  const addr = document.getElementById("tokenAddress").value.trim();
+  if (!addr || !addr.startsWith("0x")) {
+    alert("Invalid address.");
     return;
   }
 
-  const tokenCard = document.getElementById("tokenCard");
+  // Mainnet remains disabled in the UI. Analysis always runs on Testnet only.
+  const network = "arcTestnet";
+
   const riskCard = document.getElementById("riskCard");
+  const tokenCard = document.getElementById("tokenCard");
   const statusMsg = document.getElementById("statusMsg");
 
+  riskCard.classList.add("hidden");
+  tokenCard.classList.add("hidden");
   statusMsg.textContent = "Loading token data from ARC public API...";
-  tokenCard.classList.remove("hidden");
-  riskCard.classList.remove("hidden");
 
   try {
-    // For now I only support testnet (mainnet endpoint will come later)
-    const resp = await fetch(`/api/arc-token?address=${address}`);
+    const resp = await fetch(`/api/arc-token?address=${addr}&network=${network}`);
     const data = await resp.json();
 
-    if (!resp.ok || !data || !data.name) {
-      console.error("API error:", data);
-      statusMsg.textContent = "Error loading token. API did not return metadata.";
-      // I still show the risk card in case user wants to see heuristics text
-      applyRiskSignal(address, null);
+    if (!data || !data.name) {
+      statusMsg.textContent = "Token not found.";
       return;
     }
 
-    // Fill token info box
-    fillTokenInfo(address, data);
+    fillTokenInfo(addr, data, network);
+    applyRisk(addr, data); // full heuristic engine
 
-    // Run risk heuristics
-    applyRiskSignal(address, data);
-
+    tokenCard.classList.remove("hidden");
+    riskCard.classList.remove("hidden");
     statusMsg.textContent =
-      "Token loaded successfully. Always cross-check with the official explorer.";
-  } catch (err) {
-    console.error("Fetch error:", err);
+      "Token loaded successfully. Always confirm with the official explorer.";
+  } catch (e) {
+    console.error(e);
     statusMsg.textContent = "Error loading token.";
   }
 }
 
-/* -----------------------------
-   4. Token info rendering
-   ----------------------------- */
-
-function fillTokenInfo(address, token) {
-  const titleEl = document.getElementById("tokenTitle");
-  const addrShortEl = document.getElementById("tokenAddressShort");
-  const avatarEl = document.getElementById("tokenAvatar");
-
+/* -------------------------
+   Populate token info card
+--------------------------*/
+function fillTokenInfo(address, token, networkKey) {
   document.getElementById("tName").textContent = token.name || "-";
   document.getElementById("tSymbol").textContent = token.symbol || "-";
   document.getElementById("tDecimals").textContent =
@@ -93,352 +118,306 @@ function fillTokenInfo(address, token) {
   document.getElementById("tSupplyRaw").textContent =
     token.totalSupply || "-";
 
-  const human = formatHumanSupply(token.totalSupply, token.decimals);
-  document.getElementById("tSupplyHuman").textContent = human;
+  const short = shorten(address);
+  const full = document.getElementById("tokenAddressShort");
+  full.textContent = short;
+  full.dataset.full = address;
 
-  titleEl.textContent = `${token.name || "Token"} (${token.symbol || "?"})`;
-  addrShortEl.textContent = shortenAddress(address);
+  document.getElementById("tSupplyHuman").textContent =
+    formatSupply(token.totalSupply, token.decimals);
 
-  // avatar = first letter of symbol or name
-  const label =
-    (token.symbol && token.symbol[0]) ||
-    (token.name && token.name[0]) ||
-    "?";
-  avatarEl.textContent = label.toUpperCase();
+  document.getElementById("tokenTitle").textContent =
+    `${token.name || "Token"} (${token.symbol || "?"})`;
+
+  const explorer = NETWORKS[networkKey].explorerBase;
+  document.getElementById("explorerLink").href =
+    `${explorer}/token/${address}`;
+
+  document.getElementById("tokenAvatar").textContent =
+    (token.symbol?.[0] || "?").toUpperCase();
 }
 
-function shortenAddress(addr) {
-  if (!addr || addr.length < 10) return addr;
-  return addr.slice(0, 6) + "..." + addr.slice(-4);
+/* -------------------------
+   Helper: short address
+--------------------------*/
+function shorten(a) {
+  if (!a || a.length < 10) return a;
+  return a.slice(0, 6) + "..." + a.slice(-4);
 }
 
-function formatHumanSupply(raw, decimals) {
+/* -------------------------
+   Format supply as human-readable
+--------------------------*/
+function formatSupply(raw, dec) {
   if (!raw) return "-";
   try {
-    const d = Number(decimals || 0);
     const big = BigInt(raw);
-    if (d <= 0) return big.toLocaleString("en-US");
+    const d = BigInt(dec || 0);
+    if (d === 0n) return big.toLocaleString();
 
-    const factor = BigInt(10) ** BigInt(d);
-    const intPart = big / factor;
-    const fracPart = big % factor;
+    const f = BigInt(10) ** d;
+    const intPart = big / f;
+    const fracPart = big % f;
 
-    let fracStr = fracPart.toString().padStart(d, "0");
-    // UI only needs a few decimals
-    fracStr = fracStr.slice(0, 4);
-
-    return `${intPart.toLocaleString("en-US")}.${fracStr}`;
-  } catch (e) {
+    return `${intPart.toLocaleString()}.${
+      fracPart.toString().padStart(Number(d), "0").slice(0, 4)
+    }`;
+  } catch {
     return raw;
   }
 }
 
-/* -----------------------------
-   5. Heuristic risk engine
-   ----------------------------- */
-
-function applyRiskSignal(address, token) {
+/* ============================================================
+     FULL RISK ENGINE (NO GRAPHS, ONLY TEXTUAL BREAKDOWN)
+   ============================================================ */
+function applyRisk(address, token) {
   const normalized = address.toLowerCase();
   const trusted = TRUSTED_TOKENS[normalized];
 
   const riskPill = document.getElementById("riskPill");
-  const riskDescription = document.getElementById("riskDescription");
-  const breakdownList = document.getElementById("riskBreakdownList");
+  const riskTitle = document.getElementById("riskTitle");
+  const riskDesc = document.getElementById("riskDescription");
+  const verifiedBadge = document.getElementById("verifiedBadge");
 
-  // Reset pill style
-  riskPill.className = "risk-pill risk-unknown";
-  breakdownList.innerHTML = "";
+  // reset visual state
+  riskPill.className = "risk-pill";
+  verifiedBadge.classList.add("hidden");
 
-  // If I don't have token metadata, I just show a generic message
-  if (!token) {
-    riskPill.textContent = "RISKY";
-    riskDescription.textContent =
-      "Token metadata could not be loaded. Always treat unknown contracts as high risk.";
-    addBullet(breakdownList, "⚠️", "No metadata", "API did not return any data for this address.");
-    addBullet(
-      breakdownList,
-      "⚠️",
-      "Always verify",
-      "Double-check the contract on the official explorer before interacting."
-    );
-    return;
-  }
+  const breakdown = [];
+  let totalScore = 0;
 
-  // If token is in my allowlist, I treat it as trusted but still show warnings.
+  /* ------------------------------------------------
+     If token is allowlisted → automatically Trusted
+  --------------------------------------------------*/
   if (trusted) {
-    riskPill.textContent = "TRUSTED";
+    riskPill.textContent = "🟢 Trusted";
     riskPill.classList.add("risk-safe");
+    verifiedBadge.classList.remove("hidden");
 
-    riskDescription.textContent = `${token.symbol || "Token"} is marked as trusted in my local allowlist.`;
+    riskTitle.textContent = `${token.symbol || "Token"} is allowlisted.`;
+    riskDesc.textContent =
+      trusted.note + " · Still, always verify links and metadata.";
 
-    addBullet(
-      breakdownList,
-      "✅",
-      "Allowlisted token",
-      trusted.note +
-        ". Even so, always confirm contract address from official sources."
-    );
+    breakdown.push({
+      label: "Trusted list",
+      score: 0,
+      icon: "🟢",
+      reason: "This contract is explicitly listed as an official asset."
+    });
 
-    // I still run the heuristics, but they won't override the pill label
-    const extra = runHeuristics(address, token);
-    extra.forEach((item) => renderBullet(breakdownList, item));
+    renderRiskNotes("safe", totalScore, breakdown);
     return;
   }
 
-  // Run all heuristic checks
-  const results = runHeuristics(address, token);
+  /* ------------------------------------------------
+     DECIMALS CHECK
+  --------------------------------------------------*/
+  let decimalsScore = 0;
+  const decimals = Number(token.decimals || 0);
 
-  // Total score
-  const totalScore = results.reduce((acc, r) => acc + (r.scoreDelta || 0), 0);
+  if (decimals > 18 || decimals === 0) decimalsScore += 2;
 
-  // Convert score -> level
-  let level = "safe";
-  if (totalScore >= 7) level = "high";
-  else if (totalScore >= 4) level = "risky";
-  else if (totalScore >= 2) level = "caution";
+  breakdown.push({
+    label: "Decimals",
+    score: decimalsScore,
+    icon: decimalsScore ? "⚠️" : "✅",
+    reason:
+      decimals === 0
+        ? "Token has 0 decimals — unusual for ERC-20 assets."
+        : decimals > 18
+        ? "Very high decimals — often used in misleading tokens."
+        : "Decimals appear normal."
+  });
 
-  // Apply pill style + summary text
-  if (level === "safe") {
-    riskPill.textContent = "LIKELY SAFE";
-    riskPill.classList.add("risk-safe");
-    riskDescription.textContent =
-      "No strong red flags detected based on basic on-chain metadata. This still does NOT guarantee safety.";
-  } else if (level === "caution") {
-    riskPill.textContent = "CAUTION";
-    riskPill.classList.add("risk-warning");
-    riskDescription.textContent =
-      "Some parameters look a bit unusual. Make sure you fully understand this project before interacting.";
-  } else if (level === "risky") {
-    riskPill.textContent = "RISKY";
-    riskPill.classList.add("risk-warning");
-    riskDescription.textContent =
-      "Several heuristic red flags were found. Interact only if you fully understand the risks.";
-  } else {
-    // high risk
-    riskPill.textContent = "HIGH RISK";
-    riskPill.classList.add("risk-danger", "glow-danger");
-    riskDescription.textContent =
-      "Strong red flags detected. The token might be broken or designed to be unsafe. Avoid interacting.";
+  totalScore += decimalsScore;
+
+  /* ------------------------------------------------
+     NAME / SYMBOL QUALITY
+  --------------------------------------------------*/
+  let nameSymbolScore = 0;
+  const name = token.name || "";
+  const symbol = token.symbol || "";
+
+  if (!name || name.length < 3) nameSymbolScore += 1;
+  if (!symbol || symbol.length < 2 || symbol.length > 8) nameSymbolScore += 1;
+
+  breakdown.push({
+    label: "Name / Symbol",
+    score: nameSymbolScore,
+    icon: nameSymbolScore ? "⚠️" : "✅",
+    reason:
+      nameSymbolScore > 0
+        ? "Unusual name or symbol length/format."
+        : "Name and symbol look well-structured."
+  });
+
+  /* ------------------------------------------------
+     IMPERSONATION ATTEMPT (famous symbols)
+  --------------------------------------------------*/
+  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "BNB", "ARB", "MATIC"];
+  let impersonationScore = 0;
+
+  if (famousSymbols.includes(symbol.toUpperCase())) {
+    impersonationScore += 3;
   }
 
-  // Render bullets
-  results.forEach((item) => renderBullet(breakdownList, item));
-}
+  breakdown.push({
+    label: "Impersonation",
+    score: impersonationScore,
+    icon: impersonationScore ? "🚩" : "✅",
+    reason:
+      impersonationScore > 0
+        ? `Symbol matches a well-known asset (${symbol}). Could be impersonation.`
+        : "No impersonation indicators."
+  });
 
-/**
- * I keep this function pure: it only calculates the heuristic checks
- * and returns a list of { icon, label, text, scoreDelta } objects.
- */
-function runHeuristics(address, token) {
-  const results = [];
-  let score = 0;
+  totalScore += nameSymbolScore + impersonationScore;
 
-  const decimals = Number(token.decimals || 0);
+  /* ------------------------------------------------
+     SUPPLY CHECK
+  --------------------------------------------------*/
+  let supplyScore = 0;
   const supplyStr = token.totalSupply || "0";
   let supply = 0n;
   try {
     supply = BigInt(supplyStr);
-  } catch {
-    // ignore parsing error; I just treat it as 0
-  }
+  } catch {}
 
-  const symbol = (token.symbol || "").toUpperCase();
-  const name = token.name || "";
-  const normalized = address.toLowerCase();
-  const holders = typeof token.holders === "number" ? token.holders : null;
+  if (supply === 0n) supplyScore += 2;
+  if (supply > 10n ** 40n) supplyScore += 2;
 
-  /* --- 5.1 Decimals --- */
-  if (decimals === 0) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Decimals",
-      text: "Token has 0 decimals — unusual for most mainstream ERC-20 tokens. (score +2)",
-      scoreDelta: 2
-    });
-  } else if (decimals > 18) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Decimals",
-      text: `Token uses ${decimals} decimals — higher than typical 18-decimals tokens. (score +2)`,
-      scoreDelta: 2
-    });
-  } else if (decimals === 6 || decimals === 18) {
-    results.push({
-      icon: "✅",
-      label: "Decimals",
-      text: `Decimals are ${decimals}, which looks normal for many stablecoins / ERC-20 tokens. (score +0)`,
-      scoreDelta: 0
-    });
-  } else {
-    results.push({
-      icon: "⚠️",
-      label: "Decimals",
-      text: `Decimals are ${decimals}. Not necessarily bad, but a bit unusual compared to typical 6/18. (score +1)`,
-      scoreDelta: 1
-    });
-    score += 1;
-  }
+  breakdown.push({
+    label: "Total supply",
+    score: supplyScore,
+    icon: supplyScore ? "⚠️" : "✅",
+    reason:
+      supply === 0n
+        ? "Total supply is zero — token may be broken."
+        : supply > 10n ** 40n
+        ? "Extremely large supply — common red flag."
+        : "Supply looks normal."
+  });
 
-  /* --- 5.2 Name / Symbol quality --- */
-  const goodName =
-    name.length >= 3 && name.length <= 40 && !/[^a-z0-9\s\-\.\_]/i.test(name);
-  const goodSymbol =
-    symbol.length >= 2 && symbol.length <= 8 && /^[A-Z0-9]+$/.test(symbol);
+  totalScore += supplyScore;
 
-  if (goodName && goodSymbol) {
-    results.push({
-      icon: "✅",
-      label: "Name / Symbol",
-      text: "Name and symbol look reasonably structured. (score +0)",
-      scoreDelta: 0
-    });
-  } else {
-    score += 1;
-    results.push({
-      icon: "⚠️",
-      label: "Name / Symbol",
-      text: "Name or symbol look a bit odd (too short, too long or with strange characters). (score +1)",
-      scoreDelta: 1
-    });
-  }
+  /* ------------------------------------------------
+     ADDRESS PATTERN
+  --------------------------------------------------*/
+  let addrScore = 0;
+  if (normalized.startsWith("0x000000")) addrScore += 2;
 
-  /* --- 5.3 Impersonation check --- */
-  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "WBTC", "DAI"];
-  if (famousSymbols.includes(symbol) && !TRUSTED_TOKENS[normalized]) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Impersonation",
-      text: "Symbol matches a well-known token but this contract is not in my trusted list. Could be impersonation. (score +2)",
-      scoreDelta: 2
-    });
-  } else {
-    results.push({
-      icon: "✅",
-      label: "Impersonation",
-      text: "No obvious symbol impersonation detected. (score +0)",
-      scoreDelta: 0
-    });
-  }
+  breakdown.push({
+    label: "Address pattern",
+    score: addrScore,
+    icon: addrScore ? "⚠️" : "✅",
+    reason:
+      addrScore > 0
+        ? "Contract starts with many zeros — often vanity or deceptive patterns."
+        : "Nothing unusual about the address format."
+  });
 
-  /* --- 5.4 Total supply sanity --- */
-  if (supply === 0n) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Total supply",
-      text: "Total supply is zero — token may be defunct or misconfigured. (score +2)",
-      scoreDelta: 2
-    });
-  } else if (supply > 10n ** 40n) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Total supply",
-      text: "Total supply is extremely large. This can be used in weird tokenomics. (score +2)",
-      scoreDelta: 2
-    });
-  } else {
-    results.push({
-      icon: "✅",
-      label: "Total supply",
-      text: "Total supply is within a normal range for ERC-20 style tokens. (score +0)",
-      scoreDelta: 0
-    });
-  }
+  totalScore += addrScore;
 
-  /* --- 5.5 Address pattern --- */
-  if (normalized.startsWith("0x000000")) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Address pattern",
-      text: "Contract address starts with many zeros – can be fine, but often used for vanity / burn addresses. (score +2)",
-      scoreDelta: 2
-    });
-  } else {
-    results.push({
-      icon: "ℹ️",
-      label: "Address pattern",
-      text: "Contract address pattern is not inherently suspicious. (score +0)",
-      scoreDelta: 0
-    });
-  }
+  /* ------------------------------------------------
+     PLACEHOLDER CHECKS (Testnet limitations)
+  --------------------------------------------------*/
 
-  /* --- 5.6 Holders count (if available) --- */
-  if (holders === null) {
-    results.push({
-      icon: "ℹ️",
-      label: "Holders",
-      text: "Holders count is not exposed by this endpoint. On mainnet, a very low holder count is usually higher risk.",
-      scoreDelta: 0
-    });
-  } else if (holders < 10) {
-    score += 2;
-    results.push({
-      icon: "⚠️",
-      label: "Holders",
-      text: `Only ${holders} holders detected — very low liquidity / adoption. (score +2)`,
-      scoreDelta: 2
-    });
-  } else if (holders < 100) {
-    score += 1;
-    results.push({
-      icon: "⚠️",
-      label: "Holders",
-      text: `${holders} holders detected — still quite small, proceed carefully. (score +1)`,
-      scoreDelta: 1
-    });
-  } else {
-    results.push({
-      icon: "✅",
-      label: "Holders",
-      text: `${holders} holders detected — more distributed, but still no guarantee of safety. (score +0)`,
-      scoreDelta: 0
-    });
-  }
-
-  /* --- 5.7 Contract verification (placeholder) --- */
-  results.push({
-    icon: "ℹ️",
+  breakdown.push({
     label: "Contract verification",
-    text: "Verification status is not available from this testnet API. On mainnet, a non-verified contract would be a strong red flag.",
-    scoreDelta: 0
+    score: 0,
+    icon: "ℹ️",
+    reason: "Testnet API does not expose verification status."
   });
 
-  /* --- 5.8 Honeypot checks (placeholder) --- */
-  results.push({
-    icon: "ℹ️",
+  breakdown.push({
     label: "Honeypot checks",
-    text: "Static honeypot analysis (buy/sell simulation, blacklist checks) is not enabled on this testnet version.",
-    scoreDelta: 0
-  });
-
-  /* --- 5.9 Creation age (placeholder) --- */
-  results.push({
+    score: 0,
     icon: "ℹ️",
-    label: "Creation age",
-    text: "Creation block / age data is not exposed by this API on testnet. On mainnet, extremely new contracts are usually higher risk.",
-    scoreDelta: 0
+    reason: "Honeypot simulation is not available on testnet."
   });
 
-  return results;
+  breakdown.push({
+    label: "Creation age",
+    score: 0,
+    icon: "ℹ️",
+    reason: "Contract age info unavailable on this endpoint."
+  });
+
+  /* ------------------------------------------------
+     RISK LEVEL BY SCORE
+  --------------------------------------------------*/
+  let level = "safe";
+  if (totalScore >= 8) level = "danger";
+  else if (totalScore >= 4) level = "warning";
+  else if (totalScore >= 1) level = "caution";
+
+  if (level === "safe") {
+    riskPill.textContent = "🟢 Likely Safe";
+    riskPill.classList.add("risk-safe");
+    riskTitle.textContent = "No major red flags detected.";
+    riskDesc.textContent =
+      "Basic heuristics found no severe issues. Still not a safety guarantee.";
+  } else if (level === "caution") {
+    riskPill.textContent = "⚠️ Caution";
+    riskPill.classList.add("risk-warning");
+    riskTitle.textContent = "Minor unusual characteristics found.";
+    riskDesc.textContent =
+      "Some elements (decimals, naming, supply) look slightly off.";
+  } else if (level === "warning") {
+    riskPill.textContent = "⚠️ Risky";
+    riskPill.classList.add("risk-warning");
+    riskTitle.textContent = "Several red flags detected.";
+    riskDesc.textContent =
+      "Interact only if you fully understand the project and risks.";
+  } else {
+    riskPill.textContent = "🔥 High Risk";
+    riskPill.classList.add("risk-danger", "glow-danger");
+    riskTitle.textContent = "Severe risk indicators detected.";
+    riskDesc.textContent =
+      "Token appears extremely suspicious. Avoid interacting.";
+  }
+
+  renderRiskNotes(level, totalScore, breakdown);
 }
 
-/* -----------------------------
-   6. Small helpers for bullets
-   ----------------------------- */
+/* ------------------------------------------------
+   Render bullet list: "Why this rating?"
+--------------------------------------------------*/
+function renderRiskNotes(level, totalScore, breakdown) {
+  const ul = document.querySelector(".risk-notes");
+  if (!ul) return;
 
-function addBullet(ul, icon, label, text) {
-  const li = document.createElement("li");
-  li.textContent = `${icon} ${label}: ${text}`;
-  ul.appendChild(li);
-}
+  let levelLabel =
+    level === "safe"
+      ? "Likely Safe"
+      : level === "caution"
+      ? "Caution"
+      : level === "warning"
+      ? "Risky"
+      : "High Risk";
 
-function renderBullet(ul, item) {
-  const li = document.createElement("li");
-  li.textContent = `${item.icon} ${item.label}: ${item.text}`;
-  ul.appendChild(li);
+  ul.innerHTML = "";
+
+  const headerLi = document.createElement("li");
+  headerLi.innerHTML = `<strong>Why this rating? (${levelLabel}, score ${totalScore})</strong>`;
+  ul.appendChild(headerLi);
+
+  breakdown.forEach((b) => {
+    const li = document.createElement("li");
+    li.innerHTML = `${b.icon} <strong>${b.label}:</strong> ${b.reason} ${
+      b.score ? `(score +${b.score})` : ""
+    }`;
+    ul.appendChild(li);
+  });
+
+  // Standard disclaimers
+  const liHeuristic = document.createElement("li");
+  liHeuristic.textContent =
+    "Heuristic only — always verify the contract manually.";
+  ul.appendChild(liHeuristic);
+
+  const liPublic = document.createElement("li");
+  liPublic.textContent =
+    "No private APIs used, only public on-chain metadata.";
+  ul.appendChild(liPublic);
 }
