@@ -542,4 +542,24 @@ body[data-theme="light"] .risk-breakdown {
   color: var(--accent);
   transform: scale(1.15);
 }
+  /* Fix GitHub + X icons Color (Desktop + Mobile) */
+.footer-icons a,
+.footer-icons a:visited,
+.footer-icons a svg {
+    color: #9ba3b5 !important;   /* mesma cor usada no ARC Gas */
+    fill: #9ba3b5 !important;
+}
+
+/* Hover */
+.footer-icons a:hover,
+.footer-icons a:hover svg {
+    color: #1d9bf0 !important;   /* azul padrão ARC */
+    fill: #1d9bf0 !important;
+}
+
+/* Melhor espaçamento */
+.footer-icons {
+    gap: 32px !important;
+}
+
 
