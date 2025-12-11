@@ -510,30 +510,37 @@ body[data-theme="light"] .risk-breakdown {
   }
 
 /* -------------------------------------------------
-   FOOTER (Profissional – SVG Icons)
+   FOOTER — same ARC ecosystem style
 ------------------------------------------------- */
 .app-footer {
-  margin-top: 40px;
+  margin-top: 45px;
   padding: 28px 0;
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
 }
 
+/* Icon container */
 .footer-icons {
   display: flex;
   justify-content: center;
-  gap: 28px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 32px; /* mais espaçado */
+  margin-bottom: 14px;
 }
 
+/* Icon links */
 .footer-icons a {
-  color: var(--text-muted);
+  color: var(--text-muted);     
+  font-size: 24px;              
+  text-decoration: none;
   transition: 0.2s ease;
 }
 
+/* Hover */
 .footer-icons a:hover {
   color: var(--accent);
   transform: scale(1.15);
 }
+
 
