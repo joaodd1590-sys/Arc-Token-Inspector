@@ -14,7 +14,8 @@
   --mono: "SF Mono", "Consolas", "Menlo", "Roboto Mono", monospace;
 }
 
-/* Light mode overrides — futuristic UI style */
+/* Light mode futurista – override quando body[data-theme="light"] */
+
 body[data-theme="light"] {
   --bg: #f2f6ff;
   --bg-card: #ffffff;
@@ -30,7 +31,6 @@ body[data-theme="light"] {
   --unknown: #4b5563;
 }
 
-/* Layout base resets */
 * {
   box-sizing: border-box;
 }
@@ -40,11 +40,13 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text-main);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-/* Main layout container */
+/* Shell */
+
 .app-shell {
   max-width: 960px;
   margin: 40px auto 30px;
@@ -55,7 +57,6 @@ body {
   margin-bottom: 24px;
 }
 
-/* Header layout */
 .top-bar {
   display: flex;
   justify-content: space-between;
@@ -75,7 +76,8 @@ body {
   font-size: 14px;
 }
 
-/* Top-right: network selector + theme toggle */
+/* Top right controls */
+
 .top-right {
   display: flex;
   align-items: center;
@@ -99,7 +101,6 @@ body {
   font-size: 12px;
 }
 
-/* Dark/light toggle button */
 .theme-toggle {
   border: none;
   border-radius: 999px;
@@ -120,7 +121,8 @@ body {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.3);
 }
 
-/* Analyze module (input + button) */
+/* Analyze */
+
 .analyze-section {
   background: linear-gradient(135deg, #0f172a, #020617);
   border-radius: 18px;
@@ -135,7 +137,6 @@ body[data-theme="light"] .analyze-section {
   box-shadow: 0 14px 32px rgba(148, 163, 184, 0.35);
 }
 
-/* Input and button layout */
 .input-wrapper {
   display: flex;
   gap: 10px;
@@ -161,7 +162,6 @@ body[data-theme="light"] .input-wrapper input {
   color: rgba(148, 163, 184, 0.8);
 }
 
-/* Analyze button */
 .input-wrapper button {
   padding: 11px 22px;
   border-radius: 999px;
@@ -170,7 +170,8 @@ body[data-theme="light"] .input-wrapper input {
   background: var(--accent);
   color: #f9fafb;
   font-weight: 600;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.1s ease;
+  transition: transform 0.08s ease, box-shadow 0.08s ease,
+    background 0.1s ease;
   box-shadow: 0 12px 28px rgba(0, 168, 255, 0.45);
 }
 
@@ -180,7 +181,11 @@ body[data-theme="light"] .input-wrapper input {
   background: #1ec1ff;
 }
 
-/* Optional tip under input field */
+.input-wrapper button:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 18px rgba(0, 168, 255, 0.55);
+}
+
 .input-tip {
   margin: 8px 4px 0;
   font-size: 12px;
@@ -191,7 +196,8 @@ body[data-theme="light"] .input-wrapper input {
   font-family: var(--mono);
 }
 
-/* Cards grid layout */
+/* Cards grid */
+
 .cards-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
@@ -205,7 +211,8 @@ body[data-theme="light"] .input-wrapper input {
   }
 }
 
-/* Base card style */
+/* Cards */
+
 .card {
   background: var(--bg-card);
   border-radius: 18px;
@@ -217,11 +224,15 @@ body[data-theme="light"] .input-wrapper input {
   animation: fadeUp 0.25s ease forwards;
 }
 
+body[data-theme="light"] .card {
+  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.45);
+}
+
 .hidden {
   display: none !important;
 }
 
-/* Fade-in animation used when JS unhides cards */
+/* Aparecer suave quando tirar hidden via JS */
 .card-animated {
   opacity: 0;
   transform: translateY(10px);
@@ -235,100 +246,243 @@ body[data-theme="light"] .input-wrapper input {
   }
 }
 
-/* Risk card elements */
+/* Risk card */
+
+.risk-card h2 {
+  margin: 6px 0 6px;
+  font-size: 18px;
+}
+
+.risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
 .risk-pill {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-/* Risk pill colors */
+/* cinza */
 .risk-unknown {
   background: rgba(148, 163, 184, 0.15);
   color: var(--unknown);
   border: 1px solid rgba(148, 163, 184, 0.7);
 }
 
+/* verde */
 .risk-safe {
   background: rgba(34, 197, 94, 0.15);
   color: var(--safe);
   border: 1px solid rgba(34, 197, 94, 0.6);
 }
 
+/* amarelo */
 .risk-warning {
   background: rgba(252, 211, 77, 0.12);
   color: var(--warning);
   border: 1px solid rgba(252, 211, 77, 0.7);
 }
 
+/* vermelho */
 .risk-danger {
   background: rgba(248, 113, 113, 0.12);
   color: var(--danger);
   border: 1px solid rgba(248, 113, 113, 0.8);
 }
 
-/* Pulsing glow animation for high risk */
+/* Glow animation for high risk */
 .glow-danger {
   animation: pulseGlow 1.4s infinite ease-in-out;
 }
 
 @keyframes pulseGlow {
-  0% { box-shadow: 0 0 6px rgba(255, 0, 0, 0.45); }
-  50% { box-shadow: 0 0 18px rgba(255, 0, 0, 0.9); }
-  100% { box-shadow: 0 0 6px rgba(255, 0, 0, 0.45); }
+  0% {
+    box-shadow: 0 0 6px rgba(255, 0, 0, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 0, 0, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 6px rgba(255, 0, 0, 0.45);
+  }
 }
 
-/* Footer — unified ARC ecosystem style */
-.app-footer {
-  margin-top: 45px;
-  padding: 28px 0;
-  text-align: center;
+.verified-badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.7);
+  color: #e5f0ff;
+}
+
+.risk-title {
+  margin: 4px 0 4px;
+  font-weight: 600;
+}
+
+.risk-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.risk-notes {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Token card */
+
+.token-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.token-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 0, #38bdf8, #1e293b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.7);
+}
+
+body[data-theme="light"] .token-avatar {
+  background: radial-gradient(circle at 30% 0, #2563eb, #0f172a);
+}
+
+.token-header-main {
+  flex: 1;
+}
+
+.token-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.token-address-short {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.token-address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.copy-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  background: var(--bg-card-soft);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+}
+
+.copy-btn.copied {
+  background: var(--accent-soft);
+}
+
+.explorer-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.explorer-link:hover {
+  text-decoration: underline;
+}
+
+.token-fields {
+  margin-top: 10px;
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgba(31, 41, 55, 0.7);
+}
+
+body[data-theme="light"] .field-row {
+  border-bottom-color: rgba(148, 163, 184, 0.7);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-label {
   font-size: 13px;
   color: var(--text-muted);
 }
 
-/* Footer icons row */
-.footer-icons {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 32px;
-  margin-bottom: 14px;
+.field-value {
+  font-size: 13px;
 }
 
-/* Footer icon links */
-.footer-icons a {
+.status-msg {
+  margin-top: 10px;
+  font-size: 12px;
   color: var(--text-muted);
-  font-size: 24px;
-  text-decoration: none;
-  transition: 0.2s ease;
 }
 
-/* Hover effect */
-.footer-icons a:hover {
-  color: var(--accent);
-  transform: scale(1.15);
+
+
+body[data-theme="light"] .risk-breakdown {
+  border-top-color: #cbd5f5;
 }
 
-/* Forced color fix for GitHub + X icons on desktop */
-.footer-icons a,
-.footer-icons a:visited,
-.footer-icons a svg {
-  color: #9ba3b5 !important;
-  fill: #9ba3b5 !important;
+.risk-breakdown h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
 }
 
-/* Hover color fix */
-.footer-icons a:hover,
-.footer-icons a:hover svg {
-  color: #1d9bf0 !important;
-  fill: #1d9bf0 !important;
+.risk-breakdown ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
 }
 
-/* Mobile adjustments */
+.risk-breakdown li {
+  margin-bottom: 3px;
+}
+
+/* Footer */
+
+.app-footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Responsivo extra para mobile */
+
 @media (max-width: 640px) {
   .app-shell {
     margin-top: 24px;
@@ -354,4 +508,32 @@ body[data-theme="light"] .input-wrapper input {
   .input-wrapper button {
     width: 100%;
   }
+
+/* -------------------------------------------------
+   FOOTER (Profissional – SVG Icons)
+------------------------------------------------- */
+.app-footer {
+  margin-top: 40px;
+  padding: 28px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
+
+.footer-icons {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-bottom: 12px;
+}
+
+.footer-icons a {
+  color: var(--text-muted);
+  transition: 0.2s ease;
+}
+
+.footer-icons a:hover {
+  color: var(--accent);
+  transform: scale(1.15);
+}
+
