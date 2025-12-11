@@ -510,30 +510,38 @@ body[data-theme="light"] .risk-breakdown {
   }
 
 /* -------------------------------------------------
-   FOOTER (Profissional – SVG Icons)
+   FOOTER — ARC Ecosystem Professional Style
 ------------------------------------------------- */
+
 .app-footer {
-  margin-top: 40px;
+  margin-top: 45px;
   padding: 28px 0;
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
 }
 
+/* Icon row */
 .footer-icons {
   display: flex;
   justify-content: center;
-  gap: 28px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 14px;
 }
 
-.footer-icons a {
-  color: var(--text-muted);
+/* Default icon color (same as ARC Gas → #9ba3b5) */
+.footer-icons a,
+.footer-icons a svg {
+  color: #9ba3b5 !important;
+  fill: #9ba3b5 !important;
   transition: 0.2s ease;
 }
 
-.footer-icons a:hover {
-  color: var(--accent);
+/* Hover → ARC blue */
+.footer-icons a:hover,
+.footer-icons a:hover svg {
+  color: #1d9bf0 !important;
+  fill: #1d9bf0 !important;
   transform: scale(1.15);
 }
-
