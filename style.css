@@ -509,10 +509,12 @@ body[data-theme="light"] .risk-breakdown {
     width: 100%;
   }
 
-/* FOOTER (same style used in ARC Gas Estimator & Activity Tracker) */
+/* -------------------------------------------------
+   FOOTER (Profissional – SVG Icons)
+------------------------------------------------- */
 .app-footer {
   margin-top: 40px;
-  padding: 26px 0;
+  padding: 28px 0;
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
@@ -523,12 +525,10 @@ body[data-theme="light"] .risk-breakdown {
   justify-content: center;
   gap: 28px;
   margin-bottom: 12px;
-  font-size: 24px; /* Tamanho correto dos outros dApps */
 }
 
 .footer-icons a {
   color: var(--text-muted);
-  text-decoration: none;
   transition: 0.2s ease;
 }
 
@@ -536,5 +536,4 @@ body[data-theme="light"] .risk-breakdown {
   color: var(--accent);
   transform: scale(1.15);
 }
-
 
