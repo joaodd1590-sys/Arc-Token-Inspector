@@ -542,5 +542,22 @@ body[data-theme="light"] .risk-breakdown {
   color: var(--accent);
   transform: scale(1.15);
 }
+  /* Forçar cor neutra correta nos ícones do footer */
+.app-footer svg {
+  width: 26px;
+  height: 26px;
+  color: #9ba3b5 !important;     /* mesma cor dos outros dApps */
+  stroke: #9ba3b5 !important;
+  transition: 0.2s ease;
+  margin: 0 12px;                /* espaçamento igual aos outros */
+}
+
+/* Hover igual ao ARC Gas Estimator */
+.app-footer svg:hover {
+  color: var(--accent) !important;
+  stroke: var(--accent) !important;
+  transform: scale(1.15);
+}
+
 
 
