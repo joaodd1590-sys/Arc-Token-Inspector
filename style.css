@@ -509,6 +509,28 @@ body[data-theme="light"] .risk-breakdown {
     width: 100%;
   }
 
- 
-  }
+ .app-footer {
+  margin-top: 40px;
+  padding: 26px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
+
+.footer-icons {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  margin-bottom: 12px;
+}
+
+.footer-icons a {
+  color: var(--text-muted);
+  transition: 0.2s ease;
+}
+
+.footer-icons a:hover {
+  color: var(--accent);
+  transform: scale(1.15);
+}
+
