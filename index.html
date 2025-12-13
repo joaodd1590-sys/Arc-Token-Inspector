@@ -11,60 +11,32 @@
 <body data-theme="dark">
   <div class="app-shell">
 
-    <!-- NAVBAR -->
-    <header class="navbar">
-      <div class="nav-left">
-        <img src="favicon.png" class="nav-logo" />
-        <span class="nav-title">ARC Token Inspector</span>
-      </div>
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-main">
 
-      <nav class="nav-links">
-        <a href="#">Tools</a>
-        <a href="#">Docs</a>
-        <a href="#">About</a>
-      </nav>
-
-      <div class="nav-right">
-
-        <!-- SOCIAL ICONS (SVGs ORIGINAIS) -->
-        <div class="nav-socials">
-
-          <!-- GitHub -->
-          <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank" aria-label="GitHub">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0.297C5.373 0.297 0 5.67 0 12.297c0 5.286 3.438 9.772 8.205 11.36.6.111.82-.261.82-.579 
-              0-.285-.011-1.04-.017-2.04-3.338.726-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.084-.73.084-.73 
-              1.205.084 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.604-2.665-.303-5.466-1.332-5.466-5.93 
-              0-1.31.469-2.381 1.236-3.221-.123-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.301 1.23a11.48 11.48 0 013.003-.403 
-              11.48 11.48 0 013.003.403c2.292-1.552 3.298-1.23 3.298-1.23.653 1.653.241 2.873.118 3.176.77.84 1.235 1.911 
-              1.235 3.221 0 4.61-2.804 5.624-5.476 5.92.43.372.823 1.102.823 2.222 
-              0 1.604-.015 2.896-.015 3.293 0 .321.218.694.825.576C20.565 22.065 24 17.58 24 12.297 
-              24 5.67 18.627 0.297 12 0.297z"/>
-            </svg>
-          </a>
-
-          <!-- X -->
-          <a href="https://x.com/cj54475427" target="_blank" aria-label="X">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2H21.5l-7.48 8.568L23.5 22h-6.843l-5.373-6.51L5.5 
-              22H2.245l7.937-9.09L1.5 2h6.976l4.843 5.833L18.244 2zm-2.43 
-              17h1.91L8.29 4H6.29l9.524 15z"/>
-            </svg>
-          </a>
-
+        <div class="header-left">
+          <img src="favicon.png" class="header-logo" alt="ARC logo"/>
+          <div class="header-titles">
+            <h1>ARC Token Inspector</h1>
+            <p class="subtitle">
+              Token overview & heuristic security signal — no wallet connection required.
+            </p>
+          </div>
         </div>
 
-        <!-- NETWORK -->
-        <div class="network-select-wrapper">
-          <label>Network</label>
-          <select id="networkSelect">
-            <option selected>ARC Testnet</option>
-            <option disabled>ARC Mainnet (soon)</option>
-          </select>
+        <div class="header-right">
+          <div class="network-select-wrapper">
+            <label for="networkSelect">Network</label>
+            <select id="networkSelect">
+              <option value="arcTestnet" selected>ARC Testnet</option>
+              <option value="arcMainnet" disabled>ARC Mainnet (soon)</option>
+            </select>
+          </div>
+
+          <button id="themeToggle" class="theme-toggle">🌙</button>
         </div>
 
-        <!-- THEME -->
-        <button id="themeToggle" class="theme-toggle">🌙</button>
       </div>
     </header>
 
@@ -81,7 +53,7 @@
       </p>
     </section>
 
-    <!-- MAIN -->
+    <!-- RESULTADOS (INALTERADO) -->
     <main class="cards-grid">
 
       <section id="riskCard" class="card risk-card hidden">
@@ -100,12 +72,15 @@
       <section id="tokenCard" class="card token-card hidden">
         <div class="token-header">
           <div class="token-avatar" id="tokenAvatar">?</div>
+
           <div class="token-header-main">
             <h2 id="tokenTitle">Token Information</h2>
+
             <div class="token-address-row">
               <p id="tokenAddressShort" class="token-address-short mono"></p>
               <button id="copyAddressBtn" class="copy-btn">📋 Copy</button>
             </div>
+
             <a id="explorerLink" class="explorer-link" href="#" target="_blank">
               View on explorer ↗
             </a>
@@ -113,11 +88,11 @@
         </div>
 
         <div class="token-fields">
-          <div class="field-row"><span>Name</span><span id="tName">-</span></div>
-          <div class="field-row"><span>Symbol</span><span id="tSymbol">-</span></div>
-          <div class="field-row"><span>Decimals</span><span id="tDecimals">-</span></div>
-          <div class="field-row"><span>Raw Supply</span><span id="tSupplyRaw" class="mono">-</span></div>
-          <div class="field-row"><span>Human Supply</span><span id="tSupplyHuman" class="mono">-</span></div>
+          <div class="field-row"><span class="field-label">Name</span><span id="tName">-</span></div>
+          <div class="field-row"><span class="field-label">Symbol</span><span id="tSymbol">-</span></div>
+          <div class="field-row"><span class="field-label">Decimals</span><span id="tDecimals">-</span></div>
+          <div class="field-row"><span class="field-label">Raw Total Supply</span><span id="tSupplyRaw" class="mono">-</span></div>
+          <div class="field-row"><span class="field-label">Human Total Supply</span><span id="tSupplyHuman" class="mono">-</span></div>
         </div>
 
         <p id="statusMsg" class="status-msg"></p>
@@ -127,8 +102,22 @@
 
     <!-- FOOTER -->
     <footer class="app-footer">
+
+      <div class="footer-icons">
+        <!-- GitHub -->
+        <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank" aria-label="GitHub">
+          <!-- SVG ORIGINAL -->
+        </a>
+
+        <!-- X -->
+        <a href="https://x.com/cj54475427" target="_blank" aria-label="X">
+          <!-- SVG ORIGINAL -->
+        </a>
+      </div>
+
       <div>Built by João Carlos · Arc Ecosystem Community 💙</div>
       <div>© 2025 ARC Token Inspector. All rights reserved.</div>
+
     </footer>
 
   </div>
