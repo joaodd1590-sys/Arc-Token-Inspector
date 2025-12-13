@@ -23,7 +23,7 @@ window.addEventListener("mousemove", e => {
 });
 
 // Config
-const STAR_COUNT = 40;
+const STAR_COUNT = 25;
 const stars = [];
 
 function createStar() {
@@ -31,9 +31,9 @@ function createStar() {
     x: Math.random() * w,
     y: Math.random() * h,
     len: 80 + Math.random() * 120,
-    speed: 6 + Math.random() * 6,
+    speed: 3 + Math.random() * 6,
     alpha: 0.4 + Math.random() * 0.6,
-    angle: Math.PI * 0.75 // diagonal ↘
+    angle: Math.PI * 0.65 
   };
 }
 
