@@ -11,7 +11,7 @@
 
 <body data-theme="dark">
 
-  <!-- ================= NAVBAR ================= -->
+  <!-- ===== NAVBAR ===== -->
   <nav class="navbar">
     <div class="nav-left">
       <img src="favicon.png" alt="ARC" class="nav-logo"/>
@@ -24,22 +24,33 @@
     </div>
   </nav>
 
-  <!-- ============== SEPARATOR ================= -->
   <div class="nav-separator"></div>
 
-  <!-- ================= APP ==================== -->
+  <!-- ===== APP (ORIGINAL CONTENT) ===== -->
   <div class="app-shell">
 
-    <!-- HERO / INTRO -->
-    <section class="hero">
-      <h1>ARC Token Inspector</h1>
-      <p>
-        Token overview & heuristic security signal — no wallet connection required.
-      </p>
-    </section>
+    <header class="app-header">
+      <div class="top-bar">
+        <div class="top-left">
+          <h1>ARC Token Inspector</h1>
+          <p class="subtitle">
+            Token overview & heuristic security signal — no wallet connection required.
+          </p>
+        </div>
 
-    <!-- ANALYZE -->
-    <section class="analyze-section">
+        <div class="top-right">
+          <div class="network-select-wrapper">
+            <label for="networkSelect">Network</label>
+            <select id="networkSelect">
+              <option value="arcTestnet" selected>ARC Testnet</option>
+              <option value="arcMainnet" disabled>ARC Mainnet (soon)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="analyze-section card-animated">
       <div class="input-wrapper">
         <input
           id="tokenAddress"
@@ -55,25 +66,24 @@
       </p>
     </section>
 
-    <!-- CARDS -->
     <main class="cards-grid">
 
       <!-- RISK CARD -->
       <section id="riskCard" class="card risk-card hidden">
         <div class="risk-header">
           <span id="riskPill" class="risk-pill risk-unknown">Unknown</span>
-          <span id="verifiedBadge" class="verified-badge hidden">Verified</span>
+          <span id="verifiedBadge" class="verified-badge hidden">Verified token</span>
         </div>
 
         <h2>Risk & Reliability</h2>
-        <p id="riskTitle">No token loaded yet.</p>
-        <p id="riskDescription">
+        <p id="riskTitle" class="risk-title">No token loaded yet.</p>
+        <p id="riskDescription" class="risk-description">
           Paste a token address and click Analyze to see a heuristic risk signal.
         </p>
 
         <ul class="risk-notes">
           <li>Heuristic only — always double-check the contract yourself.</li>
-          <li>Some deeper checks are limited on testnet.</li>
+          <li>Some deeper checks (ABI, honeypot, creation date) are limited on testnet.</li>
         </ul>
       </section>
 
@@ -90,7 +100,7 @@
               <button id="copyAddressBtn" class="copy-btn">📋 Copy</button>
             </div>
 
-            <a id="explorerLink" class="explorer-link" target="_blank">
+            <a id="explorerLink" class="explorer-link" href="#" target="_blank">
               View on explorer ↗
             </a>
           </div>
@@ -110,7 +120,7 @@
     </main>
   </div>
 
-  <!-- ================= FOOTER ================= -->
+  <!-- ===== FOOTER ===== -->
   <footer class="app-footer">
     <div class="footer-icons">
       <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank">GitHub</a>
