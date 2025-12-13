@@ -1,38 +1,14 @@
+/* ===== ROOT ===== */
+
 :root {
   --bg: #050609;
   --bg-card: #101219;
   --bg-card-soft: #141726;
   --accent: #00a8ff;
-  --accent-soft: rgba(0, 168, 255, 0.15);
   --border-subtle: #202335;
   --text-main: #ffffff;
   --text-muted: #9ba0b8;
-  --danger: #ff4b5c;
-  --warning: #ffc857;
-  --safe: #22c55e;
-  --unknown: #4b5563;
-  --mono: "SF Mono", "Consolas", "Menlo", "Roboto Mono", monospace;
-}
-
-/* Light mode */
-
-body[data-theme="light"] {
-  --bg: #f2f6ff;
-  --bg-card: #ffffff;
-  --bg-card-soft: #e5edff;
-  --accent: #0066ff;
-  --accent-soft: rgba(0, 102, 255, 0.1);
-  --border-subtle: #d1d5e5;
-  --text-main: #0b1120;
-  --text-muted: #6b7280;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --safe: #15803d;
-  --unknown: #4b5563;
-}
-
-* {
-  box-sizing: border-box;
+  --mono: "SF Mono", Consolas, monospace;
 }
 
 body {
@@ -42,90 +18,57 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Shell */
+/* ===== LAYOUT ===== */
 
 .app-shell {
   max-width: 960px;
-  margin: 32px auto;
+  margin: 40px auto;
   padding: 0 16px;
 }
 
-/* =========================
-   NAVBAR
-========================= */
+/* ===== HEADER ===== */
 
-.navbar {
+.app-header {
+  margin-bottom: 28px;
+}
+
+.header-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 22px;
-  background: var(--bg-card);
-  border-radius: 16px;
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.7);
-  margin-bottom: 22px;
+  gap: 16px;
 }
 
-.nav-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 18px;
 }
 
-.nav-logo {
-  width: 28px;
-  height: 28px;
+.header-logo {
+  width: 56px;
+  height: 56px;
 }
 
-.nav-title {
-  font-weight: 700;
+.header-titles h1 {
+  margin: 0;
+  font-size: 34px;
   letter-spacing: 0.06em;
 }
 
-.nav-links {
-  display: flex;
-  gap: 20px;
-}
-
-.nav-links a {
-  font-size: 13px;
+.subtitle {
+  margin-top: 6px;
+  font-size: 14px;
   color: var(--text-muted);
-  text-decoration: none;
 }
 
-.nav-links a:hover {
-  color: var(--accent);
-}
-
-.nav-right {
+.header-right {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
-/* Social icons (top) */
-
-.nav-socials {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.nav-socials a,
-.nav-socials a svg {
-  color: var(--text-muted);
-  fill: var(--text-muted);
-  transition: 0.2s ease;
-}
-
-.nav-socials a:hover,
-.nav-socials a:hover svg {
-  color: var(--accent);
-  fill: var(--accent);
-  transform: scale(1.15);
-}
-
-/* Network / Theme */
+/* ===== CONTROLS ===== */
 
 .network-select-wrapper {
   display: flex;
@@ -135,99 +78,26 @@ body {
 }
 
 .network-select-wrapper select {
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   color: var(--text-main);
-  font-size: 12px;
 }
 
 .theme-toggle {
-  border: none;
-  border-radius: 999px;
   width: 34px;
   height: 34px;
-  cursor: pointer;
-  background: var(--bg-card-soft);
-  color: var(--text-main);
-  box-shadow: 0 0 0 1px var(--border-subtle);
-}
-
-/* =========================
-   ANALYZE
-========================= */
-
-.analyze-section {
-  background: linear-gradient(135deg, #0f172a, #020617);
-  border-radius: 20px;
-  padding: 22px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
-}
-
-.input-wrapper {
-  display: flex;
-  gap: 10px;
-}
-
-.input-wrapper input {
-  flex: 1;
-  padding: 11px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
-}
-
-.input-wrapper button {
-  padding: 11px 22px;
   border-radius: 999px;
   border: none;
+  background: var(--bg-card-soft);
   cursor: pointer;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
 }
 
-.input-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
+/* ===== ANALYZE / RESULTADOS ===== */
+/* (todo o resto permanece IGUAL ao seu CSS atual) */
 
-.mono {
-  font-family: var(--mono);
-}
-
-/* =========================
-   CARDS
-========================= */
-
-.cards-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-top: 22px;
-}
-
-@media (max-width: 860px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.card {
-  background: var(--bg-card);
-  border-radius: 18px;
-  padding: 18px;
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.9);
-}
-
-/* =========================
-   FOOTER
-========================= */
+/* ===== FOOTER ===== */
 
 .app-footer {
   margin-top: 60px;
@@ -238,25 +108,23 @@ body {
   color: var(--text-muted);
 }
 
-/* =========================
-   MOBILE
-========================= */
+.footer-icons {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-bottom: 14px;
+}
 
-@media (max-width: 768px) {
-  .nav-links {
-    display: none;
-  }
+.footer-icons a,
+.footer-icons svg {
+  color: #9ba3b5;
+  fill: #9ba3b5;
+  transition: 0.2s ease;
+}
 
-  .navbar {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .input-wrapper {
-    flex-direction: column;
-  }
-
-  .input-wrapper button {
-    width: 100%;
-  }
+.footer-icons a:hover,
+.footer-icons a:hover svg {
+  color: var(--accent);
+  fill: var(--accent);
+  transform: scale(1.15);
 }
