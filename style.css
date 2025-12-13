@@ -1,3 +1,7 @@
+/* ==================================================
+   ROOT / THEME
+================================================== */
+
 :root {
   --bg: #050609;
   --bg-card: #101219;
@@ -14,55 +18,81 @@
   --mono: "SF Mono", Consolas, Menlo, monospace;
 }
 
-* { box-sizing: border-box; }
+body[data-theme="light"] {
+  --bg: #f2f6ff;
+  --bg-card: #ffffff;
+  --bg-card-soft: #e5edff;
+  --accent: #0066ff;
+  --accent-soft: rgba(0, 102, 255, 0.1);
+  --border-subtle: #d1d5e5;
+  --text-main: #0b1120;
+  --text-muted: #6b7280;
+}
+
+/* ==================================================
+   BASE
+================================================== */
+
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text-main);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
 }
-
-/* ================= HEADER ================= */
 
 .app-shell {
   max-width: 960px;
-  margin: 40px auto;
+  margin: 40px auto 30px;
   padding: 0 16px;
 }
 
-.app-header { margin-bottom: 24px; }
+/* ==================================================
+   HEADER
+================================================== */
+
+.app-header {
+  margin-bottom: 28px;
+}
 
 .header-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 18px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .header-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  box-shadow: 0 0 0 1px var(--border-subtle),
-              0 10px 30px rgba(124,58,237,.35);
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    0 12px 30px rgba(124, 58, 237, 0.35);
 }
 
 .header-titles h1 {
   margin: 0;
-  font-size: 32px;
-  letter-spacing: .06em;
+  font-size: 34px;
+  letter-spacing: 0.08em;
 }
 
 .subtitle {
-  margin-top: 6px;
+  margin: 6px 0 0;
   font-size: 14px;
   color: var(--text-muted);
+  max-width: 520px;
+  line-height: 1.5;
 }
 
 .header-right {
@@ -71,14 +101,51 @@ body {
   gap: 12px;
 }
 
-/* ================= ANALYZE ================= */
+/* Network + Theme */
+
+.network-select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.network-select-wrapper select {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: var(--bg-card-soft);
+  color: var(--text-main);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+
+/* ==================================================
+   ANALYZE
+================================================== */
 
 .analyze-section {
-  background: linear-gradient(135deg,#0f172a,#020617);
+  background: linear-gradient(135deg, #0f172a, #020617);
   border-radius: 18px;
-  padding: 18px;
-  border: 1px solid rgba(148,163,184,.35);
-  box-shadow: 0 18px 40px rgba(15,23,42,.8);
+  padding: 18px 20px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
+}
+
+body[data-theme="light"] .analyze-section {
+  background: linear-gradient(135deg, #e0ebff, #f9fbff);
+  border-color: #d1d5e5;
 }
 
 .input-wrapper {
@@ -90,19 +157,24 @@ body {
   flex: 1;
   padding: 11px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(148,163,184,.4);
-  background: rgba(15,23,42,.9);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.9);
   color: #e5e7eb;
+}
+
+body[data-theme="light"] .input-wrapper input {
+  background: #ffffff;
+  color: #0b1120;
 }
 
 .input-wrapper button {
   padding: 11px 22px;
   border-radius: 999px;
   border: none;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
   cursor: pointer;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .input-tip {
@@ -111,45 +183,87 @@ body {
   color: var(--text-muted);
 }
 
-/* ================= GRID ================= */
+.mono {
+  font-family: var(--mono);
+}
+
+/* ==================================================
+   CARDS GRID
+================================================== */
 
 .cards-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
   gap: 18px;
   margin-top: 22px;
 }
 
 @media (max-width: 860px) {
-  .cards-grid { grid-template-columns: 1fr; }
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-/* ================= CARDS ================= */
+/* ==================================================
+   CARDS
+================================================== */
 
 .card {
   background: var(--bg-card);
   border-radius: 18px;
   padding: 18px;
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 16px 40px rgba(15,23,42,.9);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.9);
 }
 
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
-/* ================= TOKEN CARD (FIXADO) ================= */
+/* ================= RISK ================= */
+
+.risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.risk-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.risk-unknown { color: var(--unknown); }
+.risk-safe { color: var(--safe); }
+.risk-warning { color: var(--warning); }
+.risk-danger { color: var(--danger); }
+
+.risk-title {
+  font-weight: 600;
+}
+
+.risk-description,
+.risk-notes {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ================= TOKEN (FIXADO) ================= */
 
 .token-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .token-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 0,#38bdf8,#1e293b);
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 0, #38bdf8, #1e293b);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,6 +279,7 @@ body {
 .token-header-main h2 {
   margin: 0;
   font-size: 18px;
+  font-weight: 600;
 }
 
 .token-address-row {
@@ -172,6 +287,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-top: 4px;
+  white-space: nowrap;
 }
 
 .token-address-short {
@@ -181,11 +297,14 @@ body {
 
 .copy-btn {
   padding: 3px 10px;
-  font-size: 10px;
   border-radius: 999px;
+  font-size: 10px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-card-soft);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
 }
 
 .explorer-link {
@@ -205,16 +324,21 @@ body {
   display: flex;
   justify-content: space-between;
   padding: 5px 0;
-  border-bottom: 1px dashed rgba(31,41,55,.6);
+  border-bottom: 1px dashed rgba(31, 41, 55, 0.6);
 }
 
-.field-label { color: var(--text-muted); }
+.field-label {
+  color: var(--text-muted);
+}
 
-/* ================= FOOTER ================= */
+/* ==================================================
+   FOOTER
+================================================== */
 
 .app-footer {
   margin-top: 45px;
-  padding: 28px 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--border-subtle);
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
@@ -228,10 +352,10 @@ body {
 }
 
 .footer-icons a,
-.footer-icons svg {
+.footer-icons a svg {
   color: #9ba3b5;
   fill: #9ba3b5;
-  transition: .2s;
+  transition: 0.2s ease;
 }
 
 .footer-icons a:hover,
@@ -241,10 +365,21 @@ body {
   transform: scale(1.15);
 }
 
-/* ================= MOBILE ================= */
+/* ==================================================
+   MOBILE
+================================================== */
 
 @media (max-width: 640px) {
-  .header-main { flex-direction: column; align-items: flex-start; }
-  .input-wrapper { flex-direction: column; }
-  .input-wrapper button { width: 100%; }
+  .header-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .input-wrapper {
+    flex-direction: column;
+  }
+
+  .input-wrapper button {
+    width: 100%;
+  }
 }
