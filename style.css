@@ -14,7 +14,7 @@ body {
   color: var(--text-main);
 }
 
-/* ===== NAVBAR ===== */
+/* ================= NAVBAR ================= */
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -42,24 +42,34 @@ body {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
-.network-pill {
-  font-size: 11px;
-  padding: 4px 10px;
+.nav-network {
+  padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(29, 155, 240, 0.15);
-  border: 1px solid rgba(29, 155, 240, 0.4);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12px;
 }
 
-/* separator */
+.theme-toggle {
+  border: none;
+  background: var(--bg-card);
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
 .nav-separator {
   height: 1px;
   background: var(--border-subtle);
 }
 
-/* ===== APP ===== */
+/* ================= APP ================= */
 .app-shell {
   max-width: 960px;
   margin: 40px auto;
@@ -133,7 +143,7 @@ body {
   display: none;
 }
 
-/* ===== FOOTER ===== */
+/* ================= FOOTER ================= */
 .app-footer {
   margin-top: 50px;
   padding: 30px 0;
