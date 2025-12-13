@@ -1,3 +1,7 @@
+/* ==================================================
+   ROOT / THEME
+================================================== */
+
 :root {
   --bg: #050609;
   --bg-card: #101219;
@@ -11,10 +15,8 @@
   --warning: #ffc857;
   --safe: #22c55e;
   --unknown: #4b5563;
-  --mono: "SF Mono", "Consolas", "Menlo", "Roboto Mono", monospace;
+  --mono: "SF Mono", Consolas, Menlo, monospace;
 }
-
-/* Light mode */
 
 body[data-theme="light"] {
   --bg: #f2f6ff;
@@ -25,11 +27,11 @@ body[data-theme="light"] {
   --border-subtle: #d1d5e5;
   --text-main: #0b1120;
   --text-muted: #6b7280;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --safe: #15803d;
-  --unknown: #4b5563;
 }
+
+/* ==================================================
+   BASE
+================================================== */
 
 * {
   box-sizing: border-box;
@@ -37,16 +39,11 @@ body[data-theme="light"] {
 
 body {
   margin: 0;
-  padding: 0;
   background: var(--bg);
   color: var(--text-main);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   transition: background 0.2s ease, color 0.2s ease;
 }
-
-/* =========================
-   SHELL
-========================= */
 
 .app-shell {
   max-width: 960px;
@@ -54,40 +51,37 @@ body {
   padding: 0 16px;
 }
 
-/* =========================
-   HEADER (SAFE UPGRADE)
-========================= */
+/* ==================================================
+   HEADER
+================================================== */
 
 .app-header {
   margin-bottom: 28px;
 }
 
-.top-bar {
+.header-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
-.top-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
-/* Logo maior sem mudar HTML */
-.top-left::before {
-  content: "";
-  width: 48px;
-  height: 48px;
-  background: url("favicon.png") center / contain no-repeat;
-  border-radius: 12px;
+.header-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
   box-shadow:
     0 0 0 1px var(--border-subtle),
-    0 10px 30px rgba(124, 58, 237, 0.35);
+    0 12px 30px rgba(124, 58, 237, 0.35);
 }
 
-.app-header h1 {
+.header-titles h1 {
   margin: 0;
   font-size: 34px;
   letter-spacing: 0.08em;
@@ -95,19 +89,19 @@ body {
 
 .subtitle {
   margin: 6px 0 0;
-  color: var(--text-muted);
   font-size: 14px;
+  color: var(--text-muted);
   max-width: 520px;
   line-height: 1.5;
 }
 
-/* Top right controls */
-
-.top-right {
+.header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
+
+/* Network + Theme */
 
 .network-select-wrapper {
   display: flex;
@@ -118,7 +112,7 @@ body {
 }
 
 .network-select-wrapper select {
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-card);
@@ -127,28 +121,19 @@ body {
 }
 
 .theme-toggle {
-  border: none;
-  border-radius: 999px;
   width: 34px;
   height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 999px;
+  border: none;
   cursor: pointer;
   background: var(--bg-card-soft);
   color: var(--text-main);
   box-shadow: 0 0 0 1px var(--border-subtle);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 
-.theme-toggle:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.3);
-}
-
-/* =========================
+/* ==================================================
    ANALYZE
-========================= */
+================================================== */
 
 .analyze-section {
   background: linear-gradient(135deg, #0f172a, #020617);
@@ -161,7 +146,6 @@ body {
 body[data-theme="light"] .analyze-section {
   background: linear-gradient(135deg, #e0ebff, #f9fbff);
   border-color: #d1d5e5;
-  box-shadow: 0 14px 32px rgba(148, 163, 184, 0.35);
 }
 
 .input-wrapper {
@@ -176,17 +160,11 @@ body[data-theme="light"] .analyze-section {
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(15, 23, 42, 0.9);
   color: #e5e7eb;
-  outline: none;
 }
 
 body[data-theme="light"] .input-wrapper input {
   background: #ffffff;
   color: #0b1120;
-  border-color: #cbd5f5;
-}
-
-.input-wrapper input::placeholder {
-  color: rgba(148, 163, 184, 0.8);
 }
 
 .input-wrapper button {
@@ -195,25 +173,12 @@ body[data-theme="light"] .input-wrapper input {
   border: none;
   cursor: pointer;
   background: var(--accent);
-  color: #f9fafb;
+  color: #ffffff;
   font-weight: 600;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.1s ease;
-  box-shadow: 0 12px 28px rgba(0, 168, 255, 0.45);
-}
-
-.input-wrapper button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(0, 168, 255, 0.5);
-  background: #1ec1ff;
-}
-
-.input-wrapper button:active {
-  transform: translateY(0);
-  box-shadow: 0 8px 18px rgba(0, 168, 255, 0.55);
 }
 
 .input-tip {
-  margin: 8px 4px 0;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -222,9 +187,9 @@ body[data-theme="light"] .input-wrapper input {
   font-family: var(--mono);
 }
 
-/* =========================
+/* ==================================================
    CARDS GRID
-========================= */
+================================================== */
 
 .cards-grid {
   display: grid;
@@ -239,50 +204,28 @@ body[data-theme="light"] .input-wrapper input {
   }
 }
 
-/* =========================
-   CARDS (RESULTADOS)
-========================= */
+/* ==================================================
+   CARDS (RESULTADOS — INTACTOS)
+================================================== */
 
 .card {
   background: var(--bg-card);
   border-radius: 18px;
-  padding: 18px 18px 16px;
+  padding: 18px;
   border: 1px solid var(--border-subtle);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.9);
-  opacity: 0;
-  transform: translateY(10px);
-  animation: fadeUp 0.25s ease forwards;
-}
-
-body[data-theme="light"] .card {
-  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.45);
 }
 
 .hidden {
   display: none !important;
 }
 
-@keyframes fadeUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* =========================
-   RISK CARD
-========================= */
-
-.risk-card h2 {
-  margin: 6px 0;
-  font-size: 18px;
-}
+/* Risk */
 
 .risk-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
 }
 
 .risk-pill {
@@ -290,79 +233,29 @@ body[data-theme="light"] .card {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
 }
 
-.risk-unknown {
-  background: rgba(148, 163, 184, 0.15);
-  color: var(--unknown);
-  border: 1px solid rgba(148, 163, 184, 0.7);
-}
-
-.risk-safe {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--safe);
-  border: 1px solid rgba(34, 197, 94, 0.6);
-}
-
-.risk-warning {
-  background: rgba(252, 211, 77, 0.12);
-  color: var(--warning);
-  border: 1px solid rgba(252, 211, 77, 0.7);
-}
-
-.risk-danger {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--danger);
-  border: 1px solid rgba(248, 113, 113, 0.8);
-}
-
-.glow-danger {
-  animation: pulseGlow 1.4s infinite ease-in-out;
-}
-
-@keyframes pulseGlow {
-  0% { box-shadow: 0 0 6px rgba(255, 0, 0, 0.45); }
-  50% { box-shadow: 0 0 18px rgba(255, 0, 0, 0.9); }
-  100% { box-shadow: 0 0 6px rgba(255, 0, 0, 0.45); }
-}
-
-.verified-badge {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.7);
-  color: #e5f0ff;
-}
+.risk-unknown { color: var(--unknown); }
+.risk-safe { color: var(--safe); }
+.risk-warning { color: var(--warning); }
+.risk-danger { color: var(--danger); }
 
 .risk-title {
-  margin: 4px 0;
   font-weight: 600;
 }
 
-.risk-description {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
+.risk-description,
 .risk-notes {
-  margin-top: 10px;
-  padding-left: 20px;
+  font-size: 13px;
   color: var(--text-muted);
-  font-size: 12px;
 }
 
-/* =========================
-   TOKEN CARD
-========================= */
+/* Token */
 
 .token-header {
   display: flex;
-  align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  align-items: center;
 }
 
 .token-avatar {
@@ -374,44 +267,24 @@ body[data-theme="light"] .card {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 18px;
-}
-
-.token-header-main {
-  flex: 1;
-}
-
-.token-card h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.token-address-short {
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
 .token-address-row {
   display: flex;
-  align-items: center;
   gap: 8px;
-  margin-top: 4px;
+  align-items: center;
 }
 
 .copy-btn {
-  border: none;
-  border-radius: 999px;
   padding: 3px 10px;
+  border-radius: 999px;
   font-size: 10px;
-  cursor: pointer;
-  background: var(--bg-card-soft);
-  color: var(--text-main);
   border: 1px solid var(--border-subtle);
+  background: var(--bg-card-soft);
+  cursor: pointer;
 }
 
 .explorer-link {
-  display: inline-block;
-  margin-top: 4px;
   font-size: 11px;
   color: var(--accent);
   text-decoration: none;
@@ -425,31 +298,20 @@ body[data-theme="light"] .card {
   display: flex;
   justify-content: space-between;
   padding: 5px 0;
-  border-bottom: 1px dashed rgba(31, 41, 55, 0.7);
+  border-bottom: 1px dashed rgba(31, 41, 55, 0.6);
 }
 
 .field-label {
-  font-size: 13px;
   color: var(--text-muted);
 }
 
-.field-value {
-  font-size: 13px;
-}
-
-.status-msg {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* =========================
+/* ==================================================
    FOOTER
-========================= */
+================================================== */
 
 .app-footer {
   margin-top: 45px;
-  padding: 28px 0;
+  padding-top: 28px;
   border-top: 1px solid var(--border-subtle);
   text-align: center;
   font-size: 13px;
@@ -477,12 +339,12 @@ body[data-theme="light"] .card {
   transform: scale(1.15);
 }
 
-/* =========================
+/* ==================================================
    MOBILE
-========================= */
+================================================== */
 
 @media (max-width: 640px) {
-  .top-bar {
+  .header-main {
     flex-direction: column;
     align-items: flex-start;
   }
