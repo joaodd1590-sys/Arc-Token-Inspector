@@ -1,44 +1,9 @@
-/* ==================================================
-   ROOT / THEME
-================================================== */
-:root {
-  --bg: #050609;
-  --bg-card: #101219;
-  --bg-card-soft: #141726;
-
-  --border-subtle: #202335;
-  --accent: #00a8ff;
-  --accent-soft: rgba(0, 168, 255, 0.15);
-
-  --text-main: #ffffff;
-  --text-muted: #9ba0b8;
-
-  --safe: #22c55e;
-  --warning: #ffc857;
-  --danger: #ff4b5c;
-
-  --radius: 18px;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text-main);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-/* ==================================================
-   GLOBAL MENU (FORA DO APP)
-================================================== */
+/* ================= GLOBAL MENU ================= */
 .global-menu {
   width: 100%;
   padding: 14px 24px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -59,232 +24,42 @@ body {
   letter-spacing: 0.05em;
 }
 
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .menu-divider {
   height: 1px;
   background: var(--border-subtle);
 }
 
-/* ==================================================
-   APP SHELL
-================================================== */
-.app-shell {
-  max-width: 1100px;
-  margin: 40px auto;
-  padding: 0 16px;
+/* Divider before footer */
+.footer-divider {
+  margin-top: 48px;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
-/* ==================================================
-   HEADER (INTERNO DO APP – NÃO MUDA LAYOUT)
-================================================== */
-.app-header {
-  margin-bottom: 24px;
-}
-
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.subtitle {
-  margin-top: 6px;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-.network-select-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-}
-
-/* ==================================================
-   ANALYZE SECTION
-================================================== */
-.analyze-section {
-  background: linear-gradient(135deg, #0f172a, #020617);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: var(--radius);
-  padding: 18px 20px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
-}
-
-.input-wrapper {
-  display: flex;
-  gap: 12px;
-}
-
-.input-wrapper input {
-  flex: 1;
-  height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: #000;
-  color: var(--text-main);
-  font-size: 14px;
-}
-
-.input-wrapper button {
-  height: 44px;
-  padding: 0 22px;
-  border-radius: 999px;
-  border: none;
-  background: var(--accent);
-  color: #000;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.input-tip {
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* ==================================================
-   CARDS GRID
-================================================== */
-.cards-grid {
-  margin-top: 28px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 900px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .input-wrapper {
-    flex-direction: column;
-  }
-
-  .input-wrapper button {
-    width: 100%;
-  }
-}
-
-/* ==================================================
-   CARD BASE
-================================================== */
-.card {
-  background: linear-gradient(135deg, #0b1220, #020617);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
-}
-
-.hidden {
-  display: none;
-}
-
-/* ==================================================
-   RISK CARD
-================================================== */
-.risk-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.risk-pill {
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-.risk-pill.safe {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--safe);
-}
-
-/* ==================================================
-   TOKEN CARD
-================================================== */
-.token-header {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.token-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-}
-
-.token-address-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.copy-btn {
-  border: none;
-  background: var(--bg-card-soft);
-  color: var(--text-main);
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.explorer-link {
-  display: inline-block;
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.token-fields {
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.field-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  border-bottom: 1px dashed var(--border-subtle);
-  padding-bottom: 6px;
-}
-
-/* ==================================================
-   FOOTER (INTERNO DO APP – MANTIDO)
-================================================== */
-.app-footer {
-  margin-top: 50px;
-  padding: 28px 0;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
+/* Footer icons */
 .footer-icons {
   display: flex;
   justify-content: center;
-  gap: 26px;
-  margin-bottom: 10px;
+  gap: 32px;
+  margin-bottom: 14px;
 }
 
-.footer-icons a {
-  color: var(--text-muted);
-  text-decoration: none;
+.footer-icons a,
+.footer-icons svg {
+  color: #9ba3b5;
+  fill: #9ba3b5;
+  transition: 0.2s ease;
 }
 
-.footer-icons a:hover {
+.footer-icons a:hover,
+.footer-icons a:hover svg {
   color: var(--accent);
+  fill: var(--accent);
+  transform: scale(1.15);
 }
