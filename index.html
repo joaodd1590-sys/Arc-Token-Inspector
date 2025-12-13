@@ -1,34 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ARC Token Inspector</title>
 
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="favicon.png" />
 </head>
 
 <body data-theme="dark">
 
-  <!-- ===== NAVBAR ===== -->
+  <!-- ================= NAVBAR ================= -->
   <nav class="navbar">
     <div class="nav-left">
-      <img src="favicon.png" alt="ARC" class="nav-logo"/>
+      <img src="favicon.png" alt="ARC" class="nav-logo" />
       <span class="nav-title">ARC Token Inspector</span>
     </div>
 
     <div class="nav-right">
-      <span class="network-pill">ARC Testnet</span>
+      <!-- Network selector (MOVIDO PRAQUI) -->
+      <select id="networkSelect" class="nav-network">
+        <option value="arcTestnet" selected>ARC Testnet</option>
+        <option value="arcMainnet" disabled>ARC Mainnet (soon)</option>
+      </select>
+
       <button id="themeToggle" class="theme-toggle">🌙</button>
     </div>
   </nav>
 
   <div class="nav-separator"></div>
 
-  <!-- ===== APP (ORIGINAL CONTENT) ===== -->
+  <!-- ================= APP ================= -->
   <div class="app-shell">
 
+    <!-- HEADER ORIGINAL (SEM NETWORK AQUI) -->
     <header class="app-header">
       <div class="top-bar">
         <div class="top-left">
@@ -37,19 +43,10 @@
             Token overview & heuristic security signal — no wallet connection required.
           </p>
         </div>
-
-        <div class="top-right">
-          <div class="network-select-wrapper">
-            <label for="networkSelect">Network</label>
-            <select id="networkSelect">
-              <option value="arcTestnet" selected>ARC Testnet</option>
-              <option value="arcMainnet" disabled>ARC Mainnet (soon)</option>
-            </select>
-          </div>
-        </div>
       </div>
     </header>
 
+    <!-- ANALYZE (INALTERADO) -->
     <section class="analyze-section card-animated">
       <div class="input-wrapper">
         <input
@@ -66,6 +63,7 @@
       </p>
     </section>
 
+    <!-- RESULTS (INALTERADOS) -->
     <main class="cards-grid">
 
       <!-- RISK CARD -->
@@ -120,7 +118,7 @@
     </main>
   </div>
 
-  <!-- ===== FOOTER ===== -->
+  <!-- ================= FOOTER ================= -->
   <footer class="app-footer">
     <div class="footer-icons">
       <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank">GitHub</a>
