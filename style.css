@@ -83,3 +83,34 @@ body {
   color: var(--accent);
   transform: scale(1.15);
 }
+/* =========================
+   GLOBAL MENU (ISOLADO)
+========================= */
+.global-menu {
+  width: 100%;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+}
+
+.menu-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.menu-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+}
