@@ -402,12 +402,14 @@ body[data-theme="light"] .input-wrapper input {
 .copy-btn:active {
   background: rgba(0, 168, 255, 0.25);
 }
-/* ================= TOKEN INSPECTOR AURA ================= */
+/* ============ TOKEN INSPECTOR GRID BACKGROUND ============ */
 
-#bg-aura {
+#bg-grid {
   position: fixed;
   inset: 0;
   z-index: -2;
   pointer-events: none;
+  opacity: 0.45;
 }
+
 
