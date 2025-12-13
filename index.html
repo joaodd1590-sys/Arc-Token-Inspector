@@ -2,39 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ARC Token Inspector</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.png" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
 </head>
 
 <body data-theme="dark">
+
   <div class="app-shell">
 
     <header class="app-header">
       <div class="top-bar">
         <div class="top-left">
           <h1>ARC Token Inspector</h1>
-          <p class="subtitle">Token overview & heuristic security signal — no wallet connection required.</p>
+          <p class="subtitle">
+            Token overview & heuristic security signal — no wallet connection required.
+          </p>
         </div>
+
         <div class="top-right">
           <div class="network-select-wrapper">
-            <label for="networkSelect">Network</label>
-            <select id="networkSelect">
-              <option value="arcTestnet" selected>ARC Testnet</option>
-              <option value="arcMainnet" disabled>ARC Mainnet (soon)</option>
+            <label>Network</label>
+            <select disabled>
+              <option>ARC Testnet</option>
             </select>
           </div>
+
           <button id="themeToggle" class="theme-toggle">🌙</button>
         </div>
       </div>
     </header>
 
-    <section class="analyze-section card-animated">
+    <section class="analyze-section">
       <div class="input-wrapper">
-        <input id="tokenAddress" type="text" placeholder="Paste an ARC-20 contract address (0x...)" />
+        <input
+          id="tokenAddress"
+          placeholder="Paste an ARC-20 contract address (0x...)"
+        />
         <button id="analyzeBtn">Analyze</button>
       </div>
+
       <p class="input-tip">
         Tip: try the official USDC on ARC Testnet:
         <span class="mono">0x3600000000000000000000000000000000000000</span>
@@ -42,73 +52,42 @@
     </section>
 
     <main class="cards-grid">
-      <!-- RISK CARD -->
-      <section id="riskCard" class="card risk-card hidden">
-        <div class="risk-header">
-          <span id="riskPill" class="risk-pill risk-unknown">Unknown</span>
-          <span id="verifiedBadge" class="verified-badge hidden">Verified token</span>
-        </div>
+
+      <section id="riskCard" class="card hidden">
         <h2>Risk & Reliability</h2>
-        <p id="riskTitle" class="risk-title">No token loaded yet.</p>
-        <p id="riskDescription" class="risk-description">
+        <p id="riskTitle">No token loaded yet.</p>
+        <p id="riskDescription">
           Paste a token address and click Analyze to see a heuristic risk signal.
         </p>
-        <ul class="risk-notes">
-          <li>Heuristic only — always double-check the contract yourself.</li>
-          <li>Some deeper checks (ABI, honeypot, creation date) are limited on testnet.</li>
-        </ul>
       </section>
 
-      <!-- TOKEN CARD -->
-      <section id="tokenCard" class="card token-card hidden">
-        <div class="token-header">
-          <div class="token-avatar" id="tokenAvatar">?</div>
-          <div class="token-header-main">
-            <h2 id="tokenTitle">Token Information</h2>
-            <div class="token-address-row">
-              <p id="tokenAddressShort" class="token-address-short mono"></p>
-              <button id="copyAddressBtn" class="copy-btn">📋 Copy</button>
-            </div>
-            <a id="explorerLink" class="explorer-link" href="#" target="_blank">View on explorer ↗</a>
-          </div>
-        </div>
-        <div class="token-fields">
-          <div class="field-row"><span class="field-label">Name</span> <span id="tName" class="field-value">-</span></div>
-          <div class="field-row"><span class="field-label">Symbol</span> <span id="tSymbol" class="field-value">-</span></div>
-          <div class="field-row"><span class="field-label">Decimals</span> <span id="tDecimals" class="field-value">-</span></div>
-          <div class="field-row"><span class="field-label">Raw Total Supply</span> <span id="tSupplyRaw" class="field-value mono">-</span></div>
-          <div class="field-row"><span class="field-label">Human Total Supply</span> <span id="tSupplyHuman" class="field-value mono">-</span></div>
-        </div>
-        <p id="statusMsg" class="status-msg"></p>
+      <section id="tokenCard" class="card hidden">
+        <h2>Token Information</h2>
+
+        <button id="copyAddressBtn">📋 Copy</button>
+        <a id="explorerLink" target="_blank">View on explorer ↗</a>
+
+        <p>Name: <span id="tName">-</span></p>
+        <p>Symbol: <span id="tSymbol">-</span></p>
+        <p>Decimals: <span id="tDecimals">-</span></p>
+        <p>Raw Total Supply: <span id="tSupplyRaw">-</span></p>
+        <p>Human Total Supply: <span id="tSupplyHuman">-</span></p>
       </section>
+
     </main>
 
     <footer class="app-footer">
       <div class="footer-icons">
-        <!-- GitHub -->
-        <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank" aria-label="GitHub">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0.297C5.373 0.297 0 5.67 0 12.297c0 5.286 3.438 9.772 8.205 11.36.6.111.82-.261.82-.579 
-                0-.285-.011-1.04-.017-2.04-3.338.726-4-1.6-4-1.6-.546-1.387-1.333-1.756-1.333-1.756-1-.6.1-.6.1-.6 
-                1.2.084 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.7.4-1.3.7-1.6-2.7-.3-5.6-1.3-5.6-6a4.7 4.7 0 0 1 1.3-3.2 4.3 4.3 0 
-                0 1 .1-3.1s1-.3 3.3 1.2a11 11 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2a4.3 4.3 0 0 1 .1 3.1 4.7 4.7 0 0 1 1.3 3.2c0 4.6-2.9 
-                5.6-5.7 6a3.5 3.5 0 0 1 1 2.7v3.9c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/>
-          </svg>
-        </a>
-        <!-- X (Twitter) -->
-        <a href="https://x.com/cj54475427" target="_blank" aria-label="X">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18.244 2H21.5l-7.48 8.568L23.5 22h-6.843l-5.373-6.51L5.5 
-                22H2.245l7.937-9.09L1.5 2h6.976l4.843 5.833L18.244 2zm-2.43 
-                17h1.91L8.29 4H6.29l9.524 15z"/>
-          </svg>
-        </a>
+        <a href="https://github.com/joaodd1590-sys/Arc-Token-Inspector" target="_blank">GitHub</a>
+        <a href="https://x.com/cj54475427" target="_blank">X</a>
       </div>
-      <div>Built by João Carlos · Arc Ecosystem</div>
-      <div>© 2025 ARC Token Inspector. All rights reserved.</div>
+
+      <p>Built by João Carlos · Arc Ecosystem</p>
+      <p>© 2025 ARC Token Inspector</p>
     </footer>
+
   </div>
 
-  <script src="tokens.js"></script>
+  <script src="./tokens.js"></script>
 </body>
 </html>
