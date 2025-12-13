@@ -383,3 +383,23 @@ body[data-theme="light"] .input-wrapper input {
     width: 100%;
   }
 }
+/* =========================================
+   FIX — COPY BUTTON CONTRAST
+========================================= */
+
+.copy-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.copy-btn:hover {
+  background: rgba(0, 168, 255, 0.15);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.copy-btn:active {
+  background: rgba(0, 168, 255, 0.25);
+}
+
