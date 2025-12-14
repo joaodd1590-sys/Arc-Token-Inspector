@@ -1,23 +1,17 @@
-// ================================
-// Network configuration
-// ================================
+// ==============================
+// Network config
+// ==============================
 const NETWORKS = {
   arcTestnet: {
     label: "ARC Testnet",
-    explorerBase: "https://testnet.arcscan.app"
+    explorerBase: "https://testnet.arcscan.app",
+    apiBase: "https://testnet.arcscan.app/api"
   }
 };
 
-// ================================
-// Optional trusted tokens (badge only)
-// ================================
-const TRUSTED_TOKENS = {
-  "0x3600000000000000000000000000000000000000": {
-    label: "USDC",
-    note: "Official USDC on ARC Testnet"
-  }
-};
-
+// ==============================
+// DOM Ready
+// ==============================
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
   document.getElementById("tokenAddress").addEventListener("keyup", e => {
@@ -28,182 +22,174 @@ document.addEventListener("DOMContentLoaded", () => {
   initCopy();
 });
 
-// ================================
+// ==============================
 // Theme toggle
-// ================================
+// ==============================
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
-  const body = document.body;
-
   btn.addEventListener("click", () => {
-    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    body.setAttribute("data-theme", next);
+    const body = document.body;
+    const next = body.dataset.theme === "dark" ? "light" : "dark";
+    body.dataset.theme = next;
     btn.textContent = next === "dark" ? "🌙" : "☀️";
   });
 }
 
-// ================================
+// ==============================
 // Copy address
-// ================================
+// ==============================
 function initCopy() {
   const btn = document.getElementById("copyAddressBtn");
   btn.addEventListener("click", async () => {
-    const full = document.getElementById("tokenAddressShort")?.dataset.full;
-    if (!full) return;
+    const el = document.getElementById("tokenAddressShort");
+    if (!el?.dataset.full) return;
 
-    await navigator.clipboard.writeText(full);
+    await navigator.clipboard.writeText(el.dataset.full);
     btn.textContent = "✔ Copied";
     setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
   });
 }
 
-// ================================
-// Wallet / invalid token UI
-// ================================
-function showNotAToken(address) {
-  const riskCard = document.getElementById("riskCard");
-  const tokenCard = document.getElementById("tokenCard");
+// ==============================
+// Check if token exists on ArcScan
+// ==============================
+async function tokenExistsOnArcScan(address) {
+  try {
+    const res = await fetch(
+      `${NETWORKS.arcTestnet.apiBase}?module=token&action=tokeninfo&contractaddress=${address}`
+    );
+    const json = await res.json();
 
-  tokenCard.classList.add("hidden");
-  riskCard.classList.remove("hidden");
+    // ArcScan returns status === "1" when token exists
+    return json.status === "1" && Array.isArray(json.result);
+  } catch {
+    return false;
+  }
+}
+
+// ==============================
+// Wallet / invalid input UI
+// ==============================
+function showInvalidInput() {
+  document.getElementById("tokenCard").classList.add("hidden");
+  document.getElementById("riskCard").classList.remove("hidden");
 
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
 
   document.getElementById("riskTitle").textContent =
-    "Not a token contract.";
+    "Address is not an ARC-20 token";
 
   document.getElementById("riskDescription").textContent =
-    "The provided address does not expose ARC-20 token metadata. It may be a wallet or a non-token contract.";
+    "This address does not appear in the ARC Testnet token registry.";
 
   document.querySelector(".risk-notes").innerHTML = `
-    <li>This tool analyzes ARC-20 token contracts only.</li>
-    <li>No heuristic analysis was performed.</li>
+    <li>The address is likely a wallet or non-token contract.</li>
+    <li>Only ARC-20 token contracts can be analyzed.</li>
   `;
 }
 
-// ================================
+// ==============================
 // Main handler
-// ================================
+// ==============================
 async function handleAnalyze() {
   const addr = document.getElementById("tokenAddress").value.trim();
-  if (!addr.startsWith("0x")) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
     alert("Invalid address format.");
     return;
   }
 
-  const normalized = addr.toLowerCase();
-  const network = "arcTestnet";
+  showLoadingState();
 
-  document.getElementById("riskCard").classList.add("hidden");
-  document.getElementById("tokenCard").classList.add("hidden");
-
-  let data;
-  try {
-    const resp = await fetch(`/api/arc-token?address=${addr}&network=${network}`);
-    data = await resp.json();
-  } catch {
-    showNotAToken(addr);
+  const exists = await tokenExistsOnArcScan(addr);
+  if (!exists) {
+    hideLoadingState();
+    showInvalidInput();
     return;
   }
 
-  // 🔴 CRITICAL FIX:
-  // If token metadata does not exist → NOT A TOKEN
-  if (
-    !data ||
-    !data.name ||
-    !data.symbol ||
-    data.decimals === undefined
-  ) {
-    showNotAToken(addr);
-    return;
-  }
+  // Fetch token metadata
+  const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+  const data = await resp.json();
 
-  fillTokenInfo(addr, data, network);
+  hideLoadingState();
+
+  fillTokenInfo(addr, data);
   applyRisk(addr, data);
 
   document.getElementById("tokenCard").classList.remove("hidden");
   document.getElementById("riskCard").classList.remove("hidden");
 }
 
-// ================================
+// ==============================
+// Loading UX
+// ==============================
+function showLoadingState() {
+  document.getElementById("statusMsg").textContent =
+    "Checking ARC token registry…";
+}
+
+function hideLoadingState() {
+  document.getElementById("statusMsg").textContent = "";
+}
+
+// ==============================
 // Token info
-// ================================
-function fillTokenInfo(address, token, networkKey) {
-  document.getElementById("tName").textContent = token.name;
-  document.getElementById("tSymbol").textContent = token.symbol;
-  document.getElementById("tDecimals").textContent = token.decimals;
-  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
+// ==============================
+function fillTokenInfo(address, token) {
+  document.getElementById("tName").textContent = token.name || "Unknown";
+  document.getElementById("tSymbol").textContent = token.symbol || "—";
+  document.getElementById("tDecimals").textContent = token.decimals ?? "—";
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "—";
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
   const short = address.slice(0, 6) + "..." + address.slice(-4);
-  const addrEl = document.getElementById("tokenAddressShort");
-  addrEl.textContent = short;
-  addrEl.dataset.full = address;
+  const el = document.getElementById("tokenAddressShort");
+  el.textContent = short;
+  el.dataset.full = address;
 
-  const explorer = NETWORKS[networkKey].explorerBase;
   const link = document.getElementById("explorerLink");
-  link.href = `${explorer}/token/${address}`;
+  link.href = `${NETWORKS.arcTestnet.explorerBase}/token/${address}`;
   link.style.display = "inline";
 }
 
-// ================================
-// Risk engine
-// ================================
-function applyRisk(address, token) {
-  const normalized = address.toLowerCase();
-  const trusted = TRUSTED_TOKENS[normalized];
-
+// ==============================
+// Risk engine (SAFE DEFAULT)
+// ==============================
+function applyRisk(_, token) {
   const riskPill = document.getElementById("riskPill");
   const riskTitle = document.getElementById("riskTitle");
   const riskDesc = document.getElementById("riskDescription");
-  const notes = document.querySelector(".risk-notes");
-
-  riskPill.className = "risk-pill";
-  notes.innerHTML = "";
-
-  if (trusted) {
-    riskPill.textContent = "🟢 Trusted";
-    riskPill.classList.add("risk-safe");
-    riskTitle.textContent = "Trusted token";
-    riskDesc.textContent = trusted.note;
-    notes.innerHTML = `<li>Allowlisted official asset.</li>`;
-    return;
-  }
 
   let score = 0;
 
-  if (Number(token.decimals) === 0) score += 2;
-  if (!token.totalSupply || token.totalSupply === "0") score += 2;
+  if (!token.decimals || Number(token.decimals) === 0) score += 1;
+  if (!token.totalSupply || token.totalSupply === "0") score += 1;
 
-  if (score >= 4) {
-    riskPill.textContent = "⚠️ Risky";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Several red flags detected.";
-    riskDesc.textContent = "Token metadata shows non-standard patterns.";
-  } else {
+  if (score === 0) {
     riskPill.textContent = "🟢 Likely Safe";
-    riskPill.classList.add("risk-safe");
+    riskPill.className = "risk-pill risk-safe";
     riskTitle.textContent = "No major red flags detected.";
     riskDesc.textContent = "Token structure looks standard.";
+  } else {
+    riskPill.textContent = "⚠️ Caution";
+    riskPill.className = "risk-pill risk-warning";
+    riskTitle.textContent = "Some unusual characteristics found.";
+    riskDesc.textContent =
+      "This does not mean the token is malicious, but requires caution.";
   }
-
-  notes.innerHTML = `
-    <li>Read-only heuristic analysis.</li>
-    <li>No wallet connection required.</li>
-  `;
 }
 
-// ================================
+// ==============================
 // Utils
-// ================================
+// ==============================
 function formatSupply(raw, dec) {
   try {
     const v = BigInt(raw);
     const d = BigInt(dec);
     return (v / 10n ** d).toLocaleString();
   } catch {
-    return "-";
+    return "—";
   }
 }
