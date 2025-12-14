@@ -137,11 +137,17 @@ async function handleAnalyze() {
   statusMsg.textContent = "Checking address type...";
 
   // HARD CHECK: wallet vs contract
+  const normalized = addr.toLowerCase();
+
+// Allowlisted tokens always bypass contract detection
+if (!TRUSTED_TOKENS[normalized]) {
   const isContract = await isContractAddress(addr, network);
   if (!isContract) {
     showWalletInputError();
     return;
   }
+}
+
 
   statusMsg.textContent = "Loading token data from ARC public API...";
 
