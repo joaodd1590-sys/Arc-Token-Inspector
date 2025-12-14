@@ -2,128 +2,101 @@
 
 const RPC_URL = "https://rpc.testnet.arc.network";
 
-function keccak256(str) {
-  return (
-    "0x" +
-    require("crypto")
-      .createHash("keccak256")
-      .update(str)
-      .digest("hex")
-      .slice(0, 8)
-  );
-}
-
+// ERC-20 selectors FIXOS (padrão Ethereum)
 const SELECTORS = {
-  name: keccak256("name()"),
-  symbol: keccak256("symbol()"),
-  decimals: keccak256("decimals()"),
-  totalSupply: keccak256("totalSupply()"),
+  name: "0x06fdde03",
+  symbol: "0x95d89b41",
+  decimals: "0x313ce567",
+  totalSupply: "0x18160ddd"
 };
 
-async function rpc(method, params) {
-  try {
-    const res = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method,
-        params,
-      }),
-    });
-
-    const json = await res.json();
-    if (json.error) return null;
-    return json.result;
-  } catch {
-    return null;
-  }
-}
-
 async function ethCall(to, data) {
-  return rpc("eth_call", [{ to, data }, "latest"]);
+  const res = await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to, data }, "latest"]
+    })
+  });
+
+  const json = await res.json();
+  if (json.error) return "0x";
+  return json.result || "0x";
 }
 
-// ABI decoders
+/* ================= ABI DECODERS ================= */
+
+function isZeroHex(hex) {
+  return /^0x0*$/.test(hex);
+}
+
 function decodeString(hex) {
-  if (!hex || hex === "0x") return null;
+  if (!hex || hex === "0x" || isZeroHex(hex)) return null;
+
   const data = hex.slice(2);
   if (data.length < 128) return null;
 
   const offset = parseInt(data.slice(0, 64), 16) * 2;
   const length = parseInt(data.slice(offset, offset + 64), 16);
-  const strHex = data.slice(offset + 64, offset + 64 + length * 2);
-  return Buffer.from(strHex, "hex").toString("utf8") || null;
+  if (!length || length > 256) return null;
+
+  const start = offset + 64;
+  const strHex = data.slice(start, start + length * 2);
+  return Buffer.from(strHex, "hex").toString("utf8");
 }
 
 function decodeUint(hex) {
-  if (!hex || hex === "0x") return null;
+  if (!hex || hex === "0x" || isZeroHex(hex)) return null;
   return BigInt(hex).toString();
 }
 
-function decodeUint8(hex) {
-  if (!hex || hex === "0x") return null;
-  return parseInt(hex, 16);
+function decodeUint256(hex) {
+  if (!hex || hex === "0x" || isZeroHex(hex)) return null;
+  return Number(BigInt(hex));
 }
 
-// 🔥 Fetch token icon from ArcScan
-async function fetchTokenIcon(address) {
-  try {
-    const res = await fetch(
-      `https://testnet.arcscan.app/api/token/${address}`
-    );
-    const json = await res.json();
-    return json?.icon || null;
-  } catch {
-    return null;
-  }
-}
+/* ================= HANDLER ================= */
 
 export default async function handler(req, res) {
   const address = req.query.address?.toLowerCase();
 
-  if (!address || !address.startsWith("0x") || address.length !== 42) {
+  if (!address || !/^0x[a-f0-9]{40}$/.test(address)) {
     return res.status(400).json({ isToken: false });
   }
 
-  // 1️⃣ Wallet vs contract
-  const code = await rpc("eth_getCode", [address, "latest"]);
-  if (!code || code === "0x" || /^0x0+$/.test(code)) {
-    return res.json({ isToken: false });
-  }
-
+  let validFields = 0;
   const token = {};
-  let valid = 0;
 
-  try {
-    const nameHex = await ethCall(address, SELECTORS.name);
-    token.name = decodeString(nameHex);
-    if (token.name) valid++;
+  // name()
+  const nameHex = await ethCall(address, SELECTORS.name);
+  token.name = decodeString(nameHex);
+  if (token.name) validFields++;
 
-    const symbolHex = await ethCall(address, SELECTORS.symbol);
-    token.symbol = decodeString(symbolHex);
-    if (token.symbol) valid++;
+  // symbol()
+  const symbolHex = await ethCall(address, SELECTORS.symbol);
+  token.symbol = decodeString(symbolHex);
+  if (token.symbol) validFields++;
 
-    const decHex = await ethCall(address, SELECTORS.decimals);
-    token.decimals = decodeUint8(decHex);
-    if (token.decimals !== null) valid++;
+  // decimals()
+  const decHex = await ethCall(address, SELECTORS.decimals);
+  token.decimals = decodeUint256(decHex);
+  if (token.decimals !== null) validFields++;
 
-    const supHex = await ethCall(address, SELECTORS.totalSupply);
-    token.totalSupply = decodeUint(supHex);
-    if (token.totalSupply) valid++;
-  } catch {
+  // totalSupply()
+  const supplyHex = await ethCall(address, SELECTORS.totalSupply);
+  token.totalSupply = decodeUint(supplyHex);
+  if (token.totalSupply) validFields++;
+
+  // 🔒 REGRA FINAL
+  if (validFields < 2) {
     return res.json({ isToken: false });
   }
 
-  if (valid < 2) {
-    return res.json({ isToken: false });
-  }
-
-  token.icon = await fetchTokenIcon(address);
-
-  res.json({
+  return res.json({
     isToken: true,
-    token,
+    ...token
   });
 }
