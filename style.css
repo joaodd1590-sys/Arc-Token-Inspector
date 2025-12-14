@@ -394,3 +394,24 @@ body[data-theme="light"] .input-wrapper input {
   border-radius: 999px;
   object-fit: cover;
 }
+/* TOKEN ICON */
+.token-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 0, #38bdf8, #1e293b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.token-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+
