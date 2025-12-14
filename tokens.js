@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
    MAIN ANALYSIS FLOW
 ========================= */
 async function handleAnalyze() {
-  const addr = document.getElementById("tokenAddress").value.trim();
+  const addr = document.getElementById("tokenAddress").value.trim().toLowerCase();
 
   if (!addr || !addr.startsWith("0x") || addr.length !== 42) {
     alert("Invalid address format.");
@@ -20,24 +20,22 @@ async function handleAnalyze() {
   showLoading();
 
   try {
-    /**
-     * ÚNICA FONTE DE VERDADE:
-     * Se o ArcScan retornar metadata de token → é token
-     * Se não → wallet ou contrato não-token
-     */
-    const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+    const resp = await fetch(`/api/arc-token?address=${addr}`);
 
     if (!resp.ok) {
       showNotTokenError();
       return;
     }
 
-    const token = await resp.json();
+    const data = await resp.json();
 
-    if (!token || (!token.name && !token.symbol)) {
+    // 🔐 ÚNICA FONTE DE VERDADE
+    if (!data || data.isToken !== true || !data.token) {
       showNotTokenError();
       return;
     }
+
+    const token = data.token;
 
     fillTokenInfo(addr, token);
     applyRisk(token);
@@ -65,7 +63,7 @@ function showLoading() {
   document.getElementById("riskPill").textContent = "⏳ Loading";
   document.getElementById("riskTitle").textContent = "Analyzing address…";
   document.getElementById("riskDescription").textContent =
-    "Checking ARC Testnet token registry.";
+    "Querying ARC Testnet token registry.";
   document.querySelector(".risk-notes").innerHTML = "";
 }
 
@@ -104,9 +102,17 @@ function showSuccess(address) {
 }
 
 /* =========================
-   TOKEN INFO
+   TOKEN INFO (COM ÍCONE)
 ========================= */
 function fillTokenInfo(address, token) {
+  const avatar = document.querySelector(".token-avatar");
+
+  if (token.icon) {
+    avatar.innerHTML = `<img src="${token.icon}" alt="${token.symbol}" />`;
+  } else {
+    avatar.textContent = (token.symbol || "?")[0];
+  }
+
   document.getElementById("tName").textContent = token.name || "Unknown";
   document.getElementById("tSymbol").textContent = token.symbol || "???";
   document.getElementById("tDecimals").textContent =
@@ -134,14 +140,14 @@ function applyRisk(token) {
   let score = 0;
   notes.innerHTML = "";
 
-  if (token.decimals === 0 || token.decimals === null) {
-    score += 1;
-    notes.innerHTML += `<li>⚠️ Token has unusual decimals.</li>`;
+  if (token.decimals === null || token.decimals === undefined) {
+    score++;
+    notes.innerHTML += `<li>⚠️ Missing decimals</li>`;
   }
 
   if (!token.totalSupply || token.totalSupply === "0") {
-    score += 1;
-    notes.innerHTML += `<li>⚠️ Total supply unavailable or zero.</li>`;
+    score++;
+    notes.innerHTML += `<li>⚠️ Total supply unavailable or zero</li>`;
   }
 
   if (score === 0) {
@@ -163,9 +169,8 @@ function applyRisk(token) {
 ========================= */
 function formatSupply(raw, dec) {
   try {
-    const v = BigInt(raw);
-    const d = BigInt(dec);
-    return (v / 10n ** d).toLocaleString();
+    if (!raw || dec === null || dec === undefined) return "-";
+    return (BigInt(raw) / 10n ** BigInt(dec)).toLocaleString();
   } catch {
     return "-";
   }
