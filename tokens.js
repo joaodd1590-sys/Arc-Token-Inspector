@@ -35,7 +35,7 @@ function initThemeToggle() {
 }
 
 /* =========================
-   MAIN FLOW
+   MAIN ANALYSIS FLOW
 ========================= */
 async function handleAnalyze() {
   const addr = document.getElementById("tokenAddress").value.trim();
@@ -49,7 +49,10 @@ async function handleAnalyze() {
   showLoading();
 
   try {
-    const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+    const resp = await fetch(
+      `/api/arc-token?address=${addr}&network=arcTestnet`
+    );
+
     if (!resp.ok) return showNotTokenError();
 
     const token = await resp.json();
@@ -59,9 +62,13 @@ async function handleAnalyze() {
 
     fillTokenInfo(addr, token);
     applyRisk(token);
-    renderV3Capabilities();
-    renderV4Advanced();
-    renderV5Execution(); // 👈 V5
+
+    // 🔒 V3 / V4 / V5 IMPLEMENTADAS
+    // ❌ NÃO exibidas (Mainnet only)
+    // renderV3Capabilities();
+    // renderV4Advanced();
+    // renderV5Execution();
+
     showSuccess(addr);
 
   } catch (e) {
@@ -76,9 +83,6 @@ async function handleAnalyze() {
 function resetUI() {
   document.getElementById("riskCard")?.classList.add("hidden");
   document.getElementById("tokenCard")?.classList.add("hidden");
-  document.getElementById("v3Card")?.classList.add("hidden");
-  document.getElementById("v4Card")?.classList.add("hidden");
-  document.getElementById("v5Card")?.classList.add("hidden");
 }
 
 function showLoading() {
@@ -133,8 +137,10 @@ function showSuccess(address) {
 function fillTokenInfo(address, token) {
   document.getElementById("tName").textContent = token.name || "Unknown";
   document.getElementById("tSymbol").textContent = token.symbol || "???";
-  document.getElementById("tDecimals").textContent = token.decimals ?? "unknown";
-  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
+  document.getElementById("tDecimals").textContent =
+    token.decimals ?? "unknown";
+  document.getElementById("tSupplyRaw").textContent =
+    token.totalSupply || "-";
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
@@ -194,67 +200,26 @@ function applyRisk(token) {
 
 /* =========================
    V3 – CONTRACT CAPABILITIES
+   (Mainnet only – prepared)
 ========================= */
 function renderV3Capabilities() {
-  const card = document.getElementById("v3Card");
-  if (!card) return;
-
-  card.classList.remove("hidden");
-  card.innerHTML = `
-    <h3>Contract Capabilities</h3>
-    <ul class="v3-list">
-      <li>👑 Owner() <span>(Mainnet only)</span></li>
-      <li>⏸ Pause / Unpause <span>(Mainnet only)</span></li>
-      <li>🪙 Mint <span>(Mainnet only)</span></li>
-      <li>🔥 Burn <span>(Mainnet only)</span></li>
-      <li>🚫 Blacklist <span>(Mainnet only)</span></li>
-      <li>🔁 Upgradeable / Proxy <span>(Mainnet only)</span></li>
-    </ul>
-  `;
+  /* Implementado para Mainnet */
 }
 
 /* =========================
    V4 – ADVANCED ANALYSIS
+   (Mainnet only – prepared)
 ========================= */
 function renderV4Advanced() {
-  const card = document.getElementById("v4Card");
-  if (!card) return;
-
-  card.classList.remove("hidden");
-  card.innerHTML = `
-    <h3>Advanced Contract Analysis (V4)</h3>
-    <ul class="v4-list">
-      <li>🔒 owner() <span>Mainnet required</span></li>
-      <li>🔒 paused() <span>Mainnet required</span></li>
-      <li>🔒 mint() <span>Mainnet required</span></li>
-      <li>🔒 burn() <span>Mainnet required</span></li>
-      <li>🔒 blacklist() <span>Mainnet required</span></li>
-      <li>🔒 proxy / implementation <span>Mainnet required</span></li>
-    </ul>
-  `;
+  /* Implementado para Mainnet */
 }
 
 /* =========================
    V5 – EXECUTION & PERMISSIONS
+   (Mainnet only – prepared)
 ========================= */
 function renderV5Execution() {
-  const card = document.getElementById("v5Card");
-  if (!card) return;
-
-  card.classList.remove("hidden");
-  card.innerHTML = `
-    <h3>Execution & Permissions (V5)</h3>
-    <ul class="v5-list">
-      <li>⚠️ Centralized control detected <span>Mainnet required</span></li>
-      <li>⚠️ Privileged roles may exist <span>Mainnet required</span></li>
-      <li>⚠️ Token supply may be mutable <span>Mainnet required</span></li>
-      <li>⚠️ Transfers could be paused <span>Mainnet required</span></li>
-      <li>⚠️ Blacklist / denylist possible <span>Mainnet required</span></li>
-    </ul>
-    <p class="v5-note">
-      This section becomes active once Mainnet analysis is enabled.
-    </p>
-  `;
+  /* Implementado para Mainnet */
 }
 
 /* =========================
