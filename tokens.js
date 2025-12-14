@@ -152,10 +152,7 @@ function fillTokenInfo(address, token) {
     img.alt = token.symbol || "token";
     img.className = "token-icon-img";
 
-    img.onload = () => {
-      avatar.appendChild(img);
-    };
-
+    img.onload = () => avatar.appendChild(img);
     img.onerror = () => {
       avatar.textContent = (token.symbol || "?")[0];
     };
