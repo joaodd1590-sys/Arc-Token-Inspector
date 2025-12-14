@@ -1,216 +1,163 @@
-// Configuração da rede
-const NETWORKS = {
-  arcTestnet: {
-    label: "ARC Testnet",
-    explorerBase: "https://testnet.arcscan.app"
-  }
-};
-
-// Lista de tokens confiáveis (allowlist manual)
-const TRUSTED_TOKENS = {
-  "0x3600000000000000000000000000000000000000": {
-    label: "USDC",
-    note: "Official USDC on ARC Testnet",
-    refSupply: "25245628768486750"
-  }
-};
-
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
-  document.getElementById("tokenAddress").addEventListener("keyup", e => {
+  document.getElementById("tokenAddress").addEventListener("keydown", e => {
     if (e.key === "Enter") handleAnalyze();
   });
-
-  initThemeToggle();
-  initCopy();
 });
 
-/* -------------------------
-   Tema (light/dark)
---------------------------*/
-function initThemeToggle() {
-  const btn = document.getElementById("themeToggle");
-  const body = document.body;
+/* =========================
+   MAIN ANALYSIS FLOW
+========================= */
+async function handleAnalyze() {
+  const addr = document.getElementById("tokenAddress").value.trim();
 
-  btn.addEventListener("click", () => {
-    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    body.setAttribute("data-theme", next);
-    btn.textContent = next === "dark" ? "🌙" : "☀️";
-  });
-}
+  if (!addr || !addr.startsWith("0x") || addr.length !== 42) {
+    alert("Invalid address format.");
+    return;
+  }
 
-/* -------------------------
-   Copiar endereço
---------------------------*/
-function initCopy() {
-  const btn = document.getElementById("copyAddressBtn");
-  btn.addEventListener("click", async () => {
-    const full = document.getElementById("tokenAddressShort")?.dataset.full;
-    if (!full) return;
+  resetUI();
+  showLoading();
 
-    await navigator.clipboard.writeText(full);
-    btn.textContent = "✔ Copied";
-    setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-  });
-}
-
-/* -------------------------
-   Verificação de Contrato
---------------------------*/
-async function isContractAddress(address) {
   try {
-    // Chamada para ArcScan para verificar se o endereço tem bytecode
-    const res = await fetch(
-      `https://testnet.arcscan.app/api?module=proxy&action=eth_getCode&address=${address}&tag=latest`
-    );
-    const json = await res.json();
+    /* 1️⃣ Detect address type (server-side, no CORS issues) */
+    const detectRes = await fetch(`/api/detect-address?address=${addr}`);
+    const detect = await detectRes.json();
 
-    // Se o retorno não for "0x", é um contrato
-    if (json.result && json.result !== "0x") {
-      return true; // É um contrato válido
+    if (detect.type === "wallet") {
+      showWalletError();
+      return;
     }
 
-    return false; // Caso contrário, é uma wallet ou contrato inválido
-  } catch (e) {
-    console.error("Erro ao verificar o contrato:", e);
-    return false; // Caso ocorra erro, trata como wallet
+    if (detect.type === "contract" && !detect.erc20) {
+      showNotTokenError();
+      return;
+    }
+
+    /* 2️⃣ Load token metadata */
+    const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+    const token = await resp.json();
+
+    fillTokenInfo(addr, token);
+    applyRisk(addr, token);
+
+    showSuccess(addr);
+
+  } catch (err) {
+    console.error(err);
+    showGenericError();
   }
 }
 
-// Função para verificar se o endereço está listado como um token na ArcScan
-async function isTokenListed(address) {
-  try {
-    // Verifica se o endereço é um token registrado na ArcScan
-    const res = await fetch(`https://testnet.arcscan.app/api?module=token&action=getTokenInfo&address=${address}`);
-    const json = await res.json();
-    return json.result && json.result.status === "1"; // Se o token existir, retorna true
-  } catch (e) {
-    console.error("Erro ao verificar se o token está listado:", e);
-    return false;
-  }
+/* =========================
+   UI STATES
+========================= */
+function resetUI() {
+  document.getElementById("riskCard").classList.add("hidden");
+  document.getElementById("tokenCard").classList.add("hidden");
 }
 
-/* -------------------------
-   Erro de Wallet
---------------------------*/
-function showWalletInputError() {
+function showLoading() {
   const riskCard = document.getElementById("riskCard");
-  const tokenCard = document.getElementById("tokenCard");
-  const explorerLink = document.getElementById("explorerLink");
-
-  tokenCard.classList.add("hidden");
   riskCard.classList.remove("hidden");
 
-  // Esconde o link do explorador para wallets
-  if (explorerLink) explorerLink.style.display = "none";
+  document.getElementById("riskPill").textContent = "⏳ Loading";
+  document.getElementById("riskTitle").textContent = "Analyzing address…";
+  document.getElementById("riskDescription").textContent =
+    "Detecting address type and token metadata.";
+  document.querySelector(".risk-notes").innerHTML = "";
+}
 
-  document.getElementById("riskPill").className = "risk-pill risk-warning";
+function showWalletError() {
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
   document.getElementById("riskTitle").textContent = "Wallet address detected.";
   document.getElementById("riskDescription").textContent =
     "This tool analyzes ARC-20 token contracts only.";
-
-  document.querySelector(".risk-notes").innerHTML = `
-    <li>Please enter a valid ARC-20 contract address.</li>
-    <li>No token analysis was performed.</li>
-  `;
 }
 
-/* -------------------------
-   Função principal de análise
---------------------------*/
-async function handleAnalyze() {
-  const addr = document.getElementById("tokenAddress").value.trim();
-  if (!addr.startsWith("0x")) return alert("Invalid address.");
+function showNotTokenError() {
+  document.getElementById("riskPill").textContent = "⚠️ Not a token";
+  document.getElementById("riskTitle").textContent =
+    "Address is not an ARC-20 token.";
+  document.getElementById("riskDescription").textContent =
+    "The contract does not expose standard ERC-20 interfaces.";
+}
 
-  const normalized = addr.toLowerCase();
-  const explorerLink = document.getElementById("explorerLink");
+function showGenericError() {
+  document.getElementById("riskPill").textContent = "❌ Error";
+  document.getElementById("riskTitle").textContent =
+    "Unable to analyze address.";
+  document.getElementById("riskDescription").textContent =
+    "Unexpected error occurred.";
+}
 
-  // Resetando o estado do link do explorador
-  if (explorerLink) explorerLink.style.display = "none";
-
-  // Verificação de Wallet vs Contrato
-  const isContract = await isContractAddress(addr);
-  if (!isContract || !(await isTokenListed(addr))) {
-    showWalletInputError();
-    return;
-  }
-
-  // Se for um contrato válido, prosseguir com a análise
-  const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
-  const data = await resp.json();
-
-  if (!data || !data.name) {
-    alert("Token not found.");
-    return;
-  }
-
-  fillTokenInfo(addr, data);
-  applyRisk(addr, data);
-
-  // Liberando o link de explorador
-  if (explorerLink) {
-    explorerLink.href = `https://testnet.arcscan.app/token/${addr}`;
-    explorerLink.textContent = "View on explorer ↗";
-    explorerLink.style.display = "inline";
-  }
-
-  document.getElementById("tokenCard").classList.remove("hidden");
+function showSuccess(address) {
   document.getElementById("riskCard").classList.remove("hidden");
+  document.getElementById("tokenCard").classList.remove("hidden");
+
+  const explorer = document.getElementById("explorerLink");
+  explorer.href = `https://testnet.arcscan.app/token/${address}`;
+  explorer.style.display = "inline";
 }
 
-/* -------------------------
-   Preencher as informações do token
---------------------------*/
+/* =========================
+   TOKEN INFO
+========================= */
 function fillTokenInfo(address, token) {
-  document.getElementById("tName").textContent = token.name || "-";
-  document.getElementById("tSymbol").textContent = token.symbol || "-";
-  document.getElementById("tDecimals").textContent = token.decimals ?? "-";
-  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
+  document.getElementById("tName").textContent = token.name || "Unknown";
+  document.getElementById("tSymbol").textContent = token.symbol || "???";
+  document.getElementById("tDecimals").textContent =
+    token.decimals ?? "unknown";
+  document.getElementById("tSupplyRaw").textContent =
+    token.totalSupply || "-";
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
   const short = address.slice(0, 6) + "..." + address.slice(-4);
-  const addrEl = document.getElementById("tokenAddressShort");
-  addrEl.textContent = short;
-  addrEl.dataset.full = address;
+  const el = document.getElementById("tokenAddressShort");
+  el.textContent = short;
+  el.dataset.full = address;
 }
 
-/* -------------------------
-   Aplicar análise de risco
---------------------------*/
+/* =========================
+   BASIC RISK ENGINE
+========================= */
 function applyRisk(address, token) {
-  const normalized = address.toLowerCase();
-  const trusted = TRUSTED_TOKENS[normalized];
+  const pill = document.getElementById("riskPill");
+  const title = document.getElementById("riskTitle");
+  const desc = document.getElementById("riskDescription");
+  const notes = document.querySelector(".risk-notes");
 
-  const riskPill = document.getElementById("riskPill");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDesc = document.getElementById("riskDescription");
+  let score = 0;
+  notes.innerHTML = "";
 
-  riskPill.className = "risk-pill";
-
-  if (trusted) {
-    riskPill.textContent = "🟢 Trusted";
-    riskPill.classList.add("risk-safe");
-    riskTitle.textContent = "Trusted token";
-    riskDesc.textContent = trusted.note;
-
-    document.querySelector(".risk-notes").innerHTML = `
-      <li>Allowlisted official asset.</li>
-      <li>Still verify via official explorer.</li>
-    `;
-    return;
+  if (!token.decimals || token.decimals === 0) {
+    score += 2;
+    notes.innerHTML += `<li>⚠️ Token has unusual decimals.</li>`;
   }
 
-  riskPill.textContent = "⚠️ Risky";
-  riskPill.classList.add("risk-warning");
-  riskTitle.textContent = "Heuristic risk detected.";
-  riskDesc.textContent = "Token shows unusual characteristics.";
+  if (!token.totalSupply || token.totalSupply === "0") {
+    score += 2;
+    notes.innerHTML += `<li>⚠️ Total supply is zero or unavailable.</li>`;
+  }
+
+  if (score === 0) {
+    pill.textContent = "🟢 Likely Safe";
+    pill.className = "risk-pill risk-safe";
+    title.textContent = "No major red flags detected.";
+    desc.textContent = "Token structure looks standard.";
+  } else {
+    pill.textContent = "⚠️ Risky";
+    pill.className = "risk-pill risk-warning";
+    title.textContent = "Several red flags detected.";
+    desc.textContent =
+      "Interact only if you fully understand the risks.";
+  }
 }
 
-/* -------------------------
-   Funções auxiliares
---------------------------*/
+/* =========================
+   UTILS
+========================= */
 function formatSupply(raw, dec) {
   try {
     const v = BigInt(raw);
