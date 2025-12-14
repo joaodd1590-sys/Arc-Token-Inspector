@@ -1,38 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // ====== SAFE INIT ======
-  const analyzeBtn = document.getElementById("analyzeBtn");
-  const input = document.getElementById("tokenAddress");
-
-  if (analyzeBtn) analyzeBtn.addEventListener("click", handleAnalyze);
-  if (input) {
-    input.addEventListener("keydown", e => {
-      if (e.key === "Enter") handleAnalyze();
-    });
-  }
-
-  // Dark mode (não quebra se não existir botão)
-  initTheme();
-});
-
-/* =========================
-   DARK MODE (SAFE)
-========================= */
-function initTheme() {
-  const btn = document.getElementById("themeToggle");
-  if (!btn) return;
-
-  const saved = localStorage.getItem("theme") || "dark";
-  document.body.setAttribute("data-theme", saved);
-  btn.textContent = saved === "dark" ? "🌙" : "☀️";
-
-  btn.addEventListener("click", () => {
-    const current = document.body.getAttribute("data-theme") || "dark";
-    const next = current === "dark" ? "light" : "dark";
-    document.body.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-    btn.textContent = next === "dark" ? "🌙" : "☀️";
+  document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
+  document.getElementById("tokenAddress").addEventListener("keydown", e => {
+    if (e.key === "Enter") handleAnalyze();
   });
-}
+});
 
 /* =========================
    MAIN ANALYSIS FLOW
@@ -49,6 +20,11 @@ async function handleAnalyze() {
   showLoading();
 
   try {
+    /**
+     * ÚNICA FONTE DE VERDADE:
+     * Se o ArcScan retornar metadata de token → é token
+     * Se não → wallet ou contrato não-token
+     */
     const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
 
     if (!resp.ok) {
@@ -77,12 +53,13 @@ async function handleAnalyze() {
    UI STATES
 ========================= */
 function resetUI() {
-  document.getElementById("riskCard")?.classList.add("hidden");
-  document.getElementById("tokenCard")?.classList.add("hidden");
+  document.getElementById("riskCard").classList.add("hidden");
+  document.getElementById("tokenCard").classList.add("hidden");
 }
 
 function showLoading() {
-  document.getElementById("riskCard")?.classList.remove("hidden");
+  const riskCard = document.getElementById("riskCard");
+  riskCard.classList.remove("hidden");
 
   document.getElementById("riskPill").className = "risk-pill risk-unknown";
   document.getElementById("riskPill").textContent = "⏳ Loading";
@@ -93,7 +70,7 @@ function showLoading() {
 }
 
 function showNotTokenError() {
-  document.getElementById("riskCard")?.classList.remove("hidden");
+  document.getElementById("riskCard").classList.remove("hidden");
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
   document.getElementById("riskTitle").textContent =
@@ -108,7 +85,7 @@ function showNotTokenError() {
 }
 
 function showGenericError() {
-  document.getElementById("riskCard")?.classList.remove("hidden");
+  document.getElementById("riskCard").classList.remove("hidden");
   document.getElementById("riskPill").className = "risk-pill risk-danger";
   document.getElementById("riskPill").textContent = "❌ Error";
   document.getElementById("riskTitle").textContent =
@@ -118,15 +95,16 @@ function showGenericError() {
 }
 
 function showSuccess(address) {
-  document.getElementById("riskCard")?.classList.remove("hidden");
-  document.getElementById("tokenCard")?.classList.remove("hidden");
+  document.getElementById("riskCard").classList.remove("hidden");
+  document.getElementById("tokenCard").classList.remove("hidden");
 
   const explorer = document.getElementById("explorerLink");
-  if (explorer) explorer.href = `https://testnet.arcscan.app/token/${address}`;
+  explorer.href = `https://testnet.arcscan.app/token/${address}`;
+  explorer.style.display = "inline";
 }
 
 /* =========================
-   TOKEN INFO + ICON (SAFE)
+   TOKEN INFO
 ========================= */
 function fillTokenInfo(address, token) {
   document.getElementById("tName").textContent = token.name || "Unknown";
@@ -138,22 +116,6 @@ function fillTokenInfo(address, token) {
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
-  // Token icon (se existir container)
-  const avatar = document.getElementById("tokenAvatar");
-  if (avatar) {
-    const img = new Image();
-    img.src = `https://testnet.arcscan.app/token/images/${address}.png`;
-
-    img.onload = () => {
-      avatar.innerHTML = "";
-      avatar.appendChild(img);
-    };
-
-    img.onerror = () => {
-      avatar.textContent = (token.symbol || "?")[0];
-    };
-  }
-
   const short = address.slice(0, 6) + "..." + address.slice(-4);
   const el = document.getElementById("tokenAddressShort");
   el.textContent = short;
@@ -161,7 +123,7 @@ function fillTokenInfo(address, token) {
 }
 
 /* =========================
-   RISK ENGINE
+   RISK ENGINE (HONESTA)
 ========================= */
 function applyRisk(token) {
   const pill = document.getElementById("riskPill");
@@ -173,12 +135,12 @@ function applyRisk(token) {
   notes.innerHTML = "";
 
   if (token.decimals === 0 || token.decimals === null) {
-    score++;
+    score += 1;
     notes.innerHTML += `<li>⚠️ Token has unusual decimals.</li>`;
   }
 
   if (!token.totalSupply || token.totalSupply === "0") {
-    score++;
+    score += 1;
     notes.innerHTML += `<li>⚠️ Total supply unavailable or zero.</li>`;
   }
 
@@ -201,7 +163,9 @@ function applyRisk(token) {
 ========================= */
 function formatSupply(raw, dec) {
   try {
-    return (BigInt(raw) / 10n ** BigInt(dec)).toLocaleString();
+    const v = BigInt(raw);
+    const d = BigInt(dec);
+    return (v / 10n ** d).toLocaleString();
   } catch {
     return "-";
   }
