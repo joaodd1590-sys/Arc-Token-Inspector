@@ -1,6 +1,6 @@
-// ARC Token Inspector — corrected wallet vs token logic
-// Comments written as if authored by the project owner.
-
+// ================================
+// Network configuration
+// ================================
 const NETWORKS = {
   arcTestnet: {
     label: "ARC Testnet",
@@ -8,6 +8,9 @@ const NETWORKS = {
   }
 };
 
+// ================================
+// Optional trusted tokens (badge only)
+// ================================
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
@@ -25,189 +28,182 @@ document.addEventListener("DOMContentLoaded", () => {
   initCopy();
 });
 
-/* =========================
-   Theme toggle
-========================= */
+// ================================
+// Theme toggle
+// ================================
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
-  btn.onclick = () => {
-    const body = document.body;
-    const next = body.dataset.theme === "dark" ? "light" : "dark";
-    body.dataset.theme = next;
+  const body = document.body;
+
+  btn.addEventListener("click", () => {
+    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    body.setAttribute("data-theme", next);
     btn.textContent = next === "dark" ? "🌙" : "☀️";
-  };
+  });
 }
 
-/* =========================
-   Copy address
-========================= */
+// ================================
+// Copy address
+// ================================
 function initCopy() {
   const btn = document.getElementById("copyAddressBtn");
-  btn.onclick = async () => {
-    const el = document.getElementById("tokenAddressShort");
-    if (!el?.dataset.full) return;
-    await navigator.clipboard.writeText(el.dataset.full);
+  btn.addEventListener("click", async () => {
+    const full = document.getElementById("tokenAddressShort")?.dataset.full;
+    if (!full) return;
+
+    await navigator.clipboard.writeText(full);
     btn.textContent = "✔ Copied";
     setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-  };
+  });
 }
 
-/* =========================
-   Helpers
-========================= */
-function isHexAddress(addr) {
-  return /^0x[a-fA-F0-9]{40}$/.test(addr);
-}
+// ================================
+// Wallet / invalid token UI
+// ================================
+function showNotAToken(address) {
+  const riskCard = document.getElementById("riskCard");
+  const tokenCard = document.getElementById("tokenCard");
 
-function shorten(a) {
-  return a.slice(0, 6) + "..." + a.slice(-4);
-}
-
-function isEmptyCode(code) {
-  return /^0x0*$/i.test(code || "");
-}
-
-/* =========================
-   Wallet panel (HARD STOP)
-========================= */
-function showWalletPanel(address) {
-  document.getElementById("tokenCard").classList.add("hidden");
-  document.getElementById("riskCard").classList.remove("hidden");
+  tokenCard.classList.add("hidden");
+  riskCard.classList.remove("hidden");
 
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
 
-  document.getElementById("riskTitle").textContent = "Wallet address detected.";
+  document.getElementById("riskTitle").textContent =
+    "Not a token contract.";
+
   document.getElementById("riskDescription").textContent =
-    "This tool analyzes ARC-20 token contracts only.";
+    "The provided address does not expose ARC-20 token metadata. It may be a wallet or a non-token contract.";
 
   document.querySelector(".risk-notes").innerHTML = `
-    <li>This address does not contain contract bytecode.</li>
-    <li>No token analysis was performed.</li>
+    <li>This tool analyzes ARC-20 token contracts only.</li>
+    <li>No heuristic analysis was performed.</li>
   `;
-
-  const explorer = document.getElementById("explorerLink");
-  explorer.href = `${NETWORKS.arcTestnet.explorerBase}/address/${address}`;
-  explorer.textContent = "View on explorer ↗";
-  explorer.style.display = "inline-flex";
 }
 
-/* =========================
-   Main handler
-========================= */
+// ================================
+// Main handler
+// ================================
 async function handleAnalyze() {
   const addr = document.getElementById("tokenAddress").value.trim();
-
-  if (!isHexAddress(addr)) {
+  if (!addr.startsWith("0x")) {
     alert("Invalid address format.");
     return;
   }
 
-  const status = document.getElementById("statusMsg");
-  status.textContent = "Checking address type...";
+  const normalized = addr.toLowerCase();
+  const network = "arcTestnet";
 
-  // --- HARD WALLET CHECK ---
+  document.getElementById("riskCard").classList.add("hidden");
+  document.getElementById("tokenCard").classList.add("hidden");
+
+  let data;
   try {
-    const res = await fetch(
-      `https://testnet.arcscan.app/api?module=proxy&action=eth_getCode&address=${addr}&tag=latest`
-    );
-    const json = await res.json();
-
-    if (isEmptyCode(json.result)) {
-      showWalletPanel(addr);
-      status.textContent = "";
-      return; // ⛔ STOP EVERYTHING
-    }
+    const resp = await fetch(`/api/arc-token?address=${addr}&network=${network}`);
+    data = await resp.json();
   } catch {
-    // If detection fails, we still continue (API instability)
-  }
-
-  // --- TOKEN METADATA ---
-  status.textContent = "Loading token data...";
-  const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
-  const token = await resp.json();
-
-  if (!token || !token.name || !token.symbol) {
-    document.getElementById("tokenCard").classList.add("hidden");
-    document.getElementById("riskCard").classList.remove("hidden");
-
-    document.getElementById("riskPill").className = "risk-pill risk-warning";
-    document.getElementById("riskPill").textContent = "⚠️ Invalid input";
-    document.getElementById("riskTitle").textContent = "Not an ARC-20 token.";
-    document.getElementById("riskDescription").textContent =
-      "A contract exists at this address, but it does not expose standard ARC-20 metadata.";
-
-    document.querySelector(".risk-notes").innerHTML = `
-      <li>This may be a non-token contract.</li>
-      <li>Verify manually on the explorer.</li>
-    `;
+    showNotAToken(addr);
     return;
   }
 
-  // --- TOKEN INFO ---
-  fillTokenInfo(addr, token);
-  applyRisk(addr, token);
+  // 🔴 CRITICAL FIX:
+  // If token metadata does not exist → NOT A TOKEN
+  if (
+    !data ||
+    !data.name ||
+    !data.symbol ||
+    data.decimals === undefined
+  ) {
+    showNotAToken(addr);
+    return;
+  }
+
+  fillTokenInfo(addr, data, network);
+  applyRisk(addr, data);
 
   document.getElementById("tokenCard").classList.remove("hidden");
   document.getElementById("riskCard").classList.remove("hidden");
-  status.textContent = "Token loaded successfully.";
 }
 
-/* =========================
-   Token info
-========================= */
-function fillTokenInfo(address, token) {
+// ================================
+// Token info
+// ================================
+function fillTokenInfo(address, token, networkKey) {
   document.getElementById("tName").textContent = token.name;
   document.getElementById("tSymbol").textContent = token.symbol;
-  document.getElementById("tDecimals").textContent = token.decimals ?? "-";
-  document.getElementById("tSupplyRaw").textContent = token.totalSupply ?? "-";
-  document.getElementById("tSupplyHuman").textContent = token.totalSupply ?? "-";
+  document.getElementById("tDecimals").textContent = token.decimals;
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
+  document.getElementById("tSupplyHuman").textContent =
+    formatSupply(token.totalSupply, token.decimals);
 
+  const short = address.slice(0, 6) + "..." + address.slice(-4);
   const addrEl = document.getElementById("tokenAddressShort");
-  addrEl.textContent = shorten(address);
+  addrEl.textContent = short;
   addrEl.dataset.full = address;
 
-  const explorer = document.getElementById("explorerLink");
-  explorer.href = `${NETWORKS.arcTestnet.explorerBase}/token/${address}`;
-  explorer.style.display = "inline-flex";
+  const explorer = NETWORKS[networkKey].explorerBase;
+  const link = document.getElementById("explorerLink");
+  link.href = `${explorer}/token/${address}`;
+  link.style.display = "inline";
 }
 
-/* =========================
-   Risk engine (simplified but correct)
-========================= */
+// ================================
+// Risk engine
+// ================================
 function applyRisk(address, token) {
+  const normalized = address.toLowerCase();
+  const trusted = TRUSTED_TOKENS[normalized];
+
+  const riskPill = document.getElementById("riskPill");
+  const riskTitle = document.getElementById("riskTitle");
+  const riskDesc = document.getElementById("riskDescription");
+  const notes = document.querySelector(".risk-notes");
+
+  riskPill.className = "risk-pill";
+  notes.innerHTML = "";
+
+  if (trusted) {
+    riskPill.textContent = "🟢 Trusted";
+    riskPill.classList.add("risk-safe");
+    riskTitle.textContent = "Trusted token";
+    riskDesc.textContent = trusted.note;
+    notes.innerHTML = `<li>Allowlisted official asset.</li>`;
+    return;
+  }
+
   let score = 0;
-  const notes = [];
 
-  if (Number(token.decimals) === 0) {
-    score += 2;
-    notes.push("⚠️ Token has 0 decimals.");
-  }
+  if (Number(token.decimals) === 0) score += 2;
+  if (!token.totalSupply || token.totalSupply === "0") score += 2;
 
-  if (!token.totalSupply || token.totalSupply === "0") {
-    score += 2;
-    notes.push("⚠️ Total supply is zero or unavailable.");
-  }
-
-  const pill = document.getElementById("riskPill");
-  const title = document.getElementById("riskTitle");
-  const desc = document.getElementById("riskDescription");
-
-  pill.className = "risk-pill";
-
-  if (score === 0) {
-    pill.textContent = "🟢 Likely Safe";
-    pill.classList.add("risk-safe");
-    title.textContent = "No major red flags detected.";
-    desc.textContent = "Token structure looks standard.";
+  if (score >= 4) {
+    riskPill.textContent = "⚠️ Risky";
+    riskPill.classList.add("risk-warning");
+    riskTitle.textContent = "Several red flags detected.";
+    riskDesc.textContent = "Token metadata shows non-standard patterns.";
   } else {
-    pill.textContent = "⚠️ Risky";
-    pill.classList.add("risk-warning");
-    title.textContent = "Several red flags detected.";
-    desc.textContent = "Interact only if you fully understand the risks.";
+    riskPill.textContent = "🟢 Likely Safe";
+    riskPill.classList.add("risk-safe");
+    riskTitle.textContent = "No major red flags detected.";
+    riskDesc.textContent = "Token structure looks standard.";
   }
 
-  document.querySelector(".risk-notes").innerHTML =
-    notes.map(n => `<li>${n}</li>`).join("") +
-    "<li>Heuristic only — always verify manually.</li>";
+  notes.innerHTML = `
+    <li>Read-only heuristic analysis.</li>
+    <li>No wallet connection required.</li>
+  `;
+}
+
+// ================================
+// Utils
+// ================================
+function formatSupply(raw, dec) {
+  try {
+    const v = BigInt(raw);
+    const d = BigInt(dec);
+    return (v / 10n ** d).toLocaleString();
+  } catch {
+    return "-";
+  }
 }
