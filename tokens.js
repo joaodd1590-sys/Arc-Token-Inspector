@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ✅ INIT DARK / LIGHT MODE
   initThemeToggle();
 });
 
@@ -20,15 +19,13 @@ function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
   if (!btn) return;
 
-  // Load saved theme or default to dark
-  const savedTheme = localStorage.getItem("theme") || "dark";
-  document.body.setAttribute("data-theme", savedTheme);
-  btn.textContent = savedTheme === "dark" ? "🌙" : "☀️";
+  const saved = localStorage.getItem("theme") || "dark";
+  document.body.setAttribute("data-theme", saved);
+  btn.textContent = saved === "dark" ? "🌙" : "☀️";
 
   btn.addEventListener("click", () => {
-    const current = document.body.getAttribute("data-theme") || "dark";
+    const current = document.body.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
-
     document.body.setAttribute("data-theme", next);
     localStorage.setItem("theme", next);
     btn.textContent = next === "dark" ? "🌙" : "☀️";
@@ -51,7 +48,6 @@ async function handleAnalyze() {
 
   try {
     const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
-
     if (!resp.ok) {
       showNotTokenError();
       return;
@@ -68,8 +64,8 @@ async function handleAnalyze() {
     applyRisk(token);
     showSuccess(addr);
 
-  } catch (err) {
-    console.error(err);
+  } catch (e) {
+    console.error(e);
     showGenericError();
   }
 }
@@ -84,7 +80,6 @@ function resetUI() {
 
 function showLoading() {
   document.getElementById("riskCard")?.classList.remove("hidden");
-
   document.getElementById("riskPill").className = "risk-pill risk-unknown";
   document.getElementById("riskPill").textContent = "⏳ Loading";
   document.getElementById("riskTitle").textContent = "Analyzing address…";
@@ -130,7 +125,7 @@ function showSuccess(address) {
 }
 
 /* =========================
-   TOKEN INFO
+   TOKEN INFO + ICON
 ========================= */
 function fillTokenInfo(address, token) {
   document.getElementById("tName").textContent = token.name || "Unknown";
@@ -143,9 +138,28 @@ function fillTokenInfo(address, token) {
     formatSupply(token.totalSupply, token.decimals);
 
   const short = address.slice(0, 6) + "..." + address.slice(-4);
-  const el = document.getElementById("tokenAddressShort");
-  el.textContent = short;
-  el.dataset.full = address;
+  const addrEl = document.getElementById("tokenAddressShort");
+  addrEl.textContent = short;
+  addrEl.dataset.full = address;
+
+  // ===== TOKEN ICON =====
+  const avatar = document.getElementById("tokenAvatar");
+  if (avatar) {
+    avatar.innerHTML = "";
+
+    const img = new Image();
+    img.src = `https://testnet.arcscan.app/token/images/${address}.png`;
+    img.alt = token.symbol || "token";
+    img.className = "token-icon-img";
+
+    img.onload = () => {
+      avatar.appendChild(img);
+    };
+
+    img.onerror = () => {
+      avatar.textContent = (token.symbol || "?")[0];
+    };
+  }
 }
 
 /* =========================
@@ -189,9 +203,7 @@ function applyRisk(token) {
 ========================= */
 function formatSupply(raw, dec) {
   try {
-    const v = BigInt(raw);
-    const d = BigInt(dec);
-    return (v / 10n ** d).toLocaleString();
+    return (BigInt(raw) / 10n ** BigInt(dec)).toLocaleString();
   } catch {
     return "-";
   }
