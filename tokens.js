@@ -1,42 +1,44 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // ====== SAFE INIT ======
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const input = document.getElementById("tokenAddress");
+
+  if (analyzeBtn) analyzeBtn.addEventListener("click", handleAnalyze);
+  if (input) {
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") handleAnalyze();
+    });
+  }
+
+  // Dark mode (não quebra se não existir botão)
   initTheme();
-
-  document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
-  document.getElementById("tokenAddress").addEventListener("keydown", e => {
-    if (e.key === "Enter") handleAnalyze();
-  });
-
-  document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 });
 
 /* =========================
-   THEME (DARK / LIGHT)
+   DARK MODE (SAFE)
 ========================= */
 function initTheme() {
+  const btn = document.getElementById("themeToggle");
+  if (!btn) return;
+
   const saved = localStorage.getItem("theme") || "dark";
   document.body.setAttribute("data-theme", saved);
-  updateThemeIcon(saved);
-}
+  btn.textContent = saved === "dark" ? "🌙" : "☀️";
 
-function toggleTheme() {
-  const current = document.body.getAttribute("data-theme") || "dark";
-  const next = current === "dark" ? "light" : "dark";
-
-  document.body.setAttribute("data-theme", next);
-  localStorage.setItem("theme", next);
-  updateThemeIcon(next);
-}
-
-function updateThemeIcon(theme) {
-  const btn = document.getElementById("themeToggle");
-  btn.textContent = theme === "dark" ? "🌙" : "☀️";
+  btn.addEventListener("click", () => {
+    const current = document.body.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+    document.body.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+    btn.textContent = next === "dark" ? "🌙" : "☀️";
+  });
 }
 
 /* =========================
    MAIN ANALYSIS FLOW
 ========================= */
 async function handleAnalyze() {
-  const addr = document.getElementById("tokenAddress").value.trim().toLowerCase();
+  const addr = document.getElementById("tokenAddress").value.trim();
 
   if (!addr || !addr.startsWith("0x") || addr.length !== 42) {
     alert("Invalid address format.");
@@ -47,7 +49,7 @@ async function handleAnalyze() {
   showLoading();
 
   try {
-    const resp = await fetch(`/api/arc-token?address=${addr}`);
+    const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
 
     if (!resp.ok) {
       showNotTokenError();
@@ -75,23 +77,23 @@ async function handleAnalyze() {
    UI STATES
 ========================= */
 function resetUI() {
-  document.getElementById("riskCard").classList.add("hidden");
-  document.getElementById("tokenCard").classList.add("hidden");
+  document.getElementById("riskCard")?.classList.add("hidden");
+  document.getElementById("tokenCard")?.classList.add("hidden");
 }
 
 function showLoading() {
-  document.getElementById("riskCard").classList.remove("hidden");
+  document.getElementById("riskCard")?.classList.remove("hidden");
 
   document.getElementById("riskPill").className = "risk-pill risk-unknown";
   document.getElementById("riskPill").textContent = "⏳ Loading";
   document.getElementById("riskTitle").textContent = "Analyzing address…";
   document.getElementById("riskDescription").textContent =
-    "Querying ARC Testnet registry.";
+    "Checking ARC Testnet token registry.";
   document.querySelector(".risk-notes").innerHTML = "";
 }
 
 function showNotTokenError() {
-  document.getElementById("riskCard").classList.remove("hidden");
+  document.getElementById("riskCard")?.classList.remove("hidden");
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
   document.getElementById("riskTitle").textContent =
@@ -106,7 +108,7 @@ function showNotTokenError() {
 }
 
 function showGenericError() {
-  document.getElementById("riskCard").classList.remove("hidden");
+  document.getElementById("riskCard")?.classList.remove("hidden");
   document.getElementById("riskPill").className = "risk-pill risk-danger";
   document.getElementById("riskPill").textContent = "❌ Error";
   document.getElementById("riskTitle").textContent =
@@ -116,15 +118,15 @@ function showGenericError() {
 }
 
 function showSuccess(address) {
-  document.getElementById("riskCard").classList.remove("hidden");
-  document.getElementById("tokenCard").classList.remove("hidden");
+  document.getElementById("riskCard")?.classList.remove("hidden");
+  document.getElementById("tokenCard")?.classList.remove("hidden");
 
-  document.getElementById("explorerLink").href =
-    `https://testnet.arcscan.app/token/${address}`;
+  const explorer = document.getElementById("explorerLink");
+  if (explorer) explorer.href = `https://testnet.arcscan.app/token/${address}`;
 }
 
 /* =========================
-   TOKEN INFO + ICON
+   TOKEN INFO + ICON (SAFE)
 ========================= */
 function fillTokenInfo(address, token) {
   document.getElementById("tName").textContent = token.name || "Unknown";
@@ -136,20 +138,26 @@ function fillTokenInfo(address, token) {
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
+  // Token icon (se existir container)
   const avatar = document.getElementById("tokenAvatar");
-  const img = new Image();
+  if (avatar) {
+    const img = new Image();
+    img.src = `https://testnet.arcscan.app/token/images/${address}.png`;
 
-  img.src = `https://testnet.arcscan.app/token/images/${address}.png`;
-  img.onload = () => {
-    avatar.innerHTML = "";
-    avatar.appendChild(img);
-  };
-  img.onerror = () => {
-    avatar.textContent = (token.symbol || "?")[0];
-  };
+    img.onload = () => {
+      avatar.innerHTML = "";
+      avatar.appendChild(img);
+    };
+
+    img.onerror = () => {
+      avatar.textContent = (token.symbol || "?")[0];
+    };
+  }
 
   const short = address.slice(0, 6) + "..." + address.slice(-4);
-  document.getElementById("tokenAddressShort").textContent = short;
+  const el = document.getElementById("tokenAddressShort");
+  el.textContent = short;
+  el.dataset.full = address;
 }
 
 /* =========================
@@ -164,26 +172,27 @@ function applyRisk(token) {
   let score = 0;
   notes.innerHTML = "";
 
-  if (token.decimals === 0 || token.decimals == null) {
+  if (token.decimals === 0 || token.decimals === null) {
     score++;
-    notes.innerHTML += `<li>⚠️ Unusual decimals</li>`;
+    notes.innerHTML += `<li>⚠️ Token has unusual decimals.</li>`;
   }
 
   if (!token.totalSupply || token.totalSupply === "0") {
     score++;
-    notes.innerHTML += `<li>⚠️ Total supply unavailable</li>`;
+    notes.innerHTML += `<li>⚠️ Total supply unavailable or zero.</li>`;
   }
 
   if (score === 0) {
     pill.textContent = "🟢 Likely Safe";
     pill.className = "risk-pill risk-safe";
-    title.textContent = "No major red flags detected";
-    desc.textContent = "Standard ARC-20 metadata.";
+    title.textContent = "No major red flags detected.";
+    desc.textContent = "Token metadata looks standard.";
   } else {
     pill.textContent = "⚠️ Risky";
     pill.className = "risk-pill risk-warning";
-    title.textContent = "Some anomalies detected";
-    desc.textContent = "Review token carefully.";
+    title.textContent = "Some risk indicators detected.";
+    desc.textContent =
+      "Token has non-standard or incomplete metadata.";
   }
 }
 
