@@ -388,3 +388,29 @@ body[data-theme="light"] .input-wrapper input {
   z-index: -2;
   pointer-events: none;
 }
+.token-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.token-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6d28ff, #9333ea);
+  color: white;
+  font-weight: 700;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.token-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
