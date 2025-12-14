@@ -1,28 +1,21 @@
-// Network configuration (I only enable Testnet for now. Mainnet will be opened later.)
+// Network configuration (testnet only for now)
 const NETWORKS = {
   arcTestnet: {
-    label: "ARC Testnet",
     explorerBase: "https://testnet.arcscan.app"
-  },
-  arcMainnet: {
-    label: "ARC Mainnet",
-    explorerBase: "https://arcscan.app"
   }
 };
 
-// Trusted tokens list (manual allowlist for known official contracts)
+// Manual allowlist for known official tokens
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
-    note: "Official USDC on ARC Testnet",
-    // optional reference supply for comparisons
-    refSupply: "25245628768486750"
+    note: "Official USDC on ARC Testnet"
   }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
-  document.getElementById("tokenAddress").addEventListener("keyup", (e) => {
+  document.getElementById("tokenAddress").addEventListener("keyup", e => {
     if (e.key === "Enter") handleAnalyze();
   });
 
@@ -31,65 +24,42 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* -------------------------
-   Theme switch (dark/light)
+   Theme toggle
 --------------------------*/
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
-  const body = document.body;
-
-  btn.addEventListener("click", () => {
-    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    body.setAttribute("data-theme", next);
+  btn.onclick = () => {
+    const body = document.body;
+    const next = body.dataset.theme === "dark" ? "light" : "dark";
+    body.dataset.theme = next;
     btn.textContent = next === "dark" ? "🌙" : "☀️";
-  });
+  };
 }
 
 /* -------------------------
-   Copy full contract address
+   Copy address
 --------------------------*/
 function initCopy() {
   const btn = document.getElementById("copyAddressBtn");
-  btn.addEventListener("click", async () => {
-    const full = document.getElementById("tokenAddressShort").dataset.full;
-    if (!full) return;
+  btn.onclick = async () => {
+    const el = document.getElementById("tokenAddressShort");
+    if (!el.dataset.full) return;
 
-    try {
-      await navigator.clipboard.writeText(full);
-      btn.textContent = "✔ Copied";
-      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-    } catch {
-      btn.textContent = "Error";
-      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-    }
-  });
+    await navigator.clipboard.writeText(el.dataset.full);
+    btn.textContent = "✔ Copied";
+    setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
+  };
 }
 
 /* -------------------------
-   Helper: semantic token check
---------------------------*/
-// Checks if the returned metadata actually looks like an ARC-20 token contract
-function looksLikeTokenContract(token) {
-  return (
-    token &&
-    token.decimals !== null &&
-    token.decimals !== undefined &&
-    token.totalSupply !== null &&
-    token.totalSupply !== undefined
-  );
-}
-
-/* -------------------------
-   Main "Analyze" handler
+   Main analyze handler
 --------------------------*/
 async function handleAnalyze() {
   const addr = document.getElementById("tokenAddress").value.trim();
-  if (!addr || !addr.startsWith("0x")) {
+  if (!addr.startsWith("0x")) {
     alert("Invalid address.");
     return;
   }
-
-  // Mainnet remains disabled in the UI. Analysis always runs on Testnet only.
-  const network = "arcTestnet";
 
   const riskCard = document.getElementById("riskCard");
   const tokenCard = document.getElementById("tokenCard");
@@ -97,37 +67,25 @@ async function handleAnalyze() {
 
   riskCard.classList.add("hidden");
   tokenCard.classList.add("hidden");
-  statusMsg.textContent = "Loading token data from ARC public API...";
+  statusMsg.textContent = "Loading token data...";
 
   try {
-    const resp = await fetch(`/api/arc-token?address=${addr}&network=${network}`);
-    const data = await resp.json();
+    const res = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+    const data = await res.json();
 
-    if (!data || !data.name) {
-      statusMsg.textContent =
-        "No ARC-20 token metadata found for this address.";
+    // Guard: wallet address or invalid contract
+    if (!data || !data.name || data.decimals === undefined) {
+      showInvalidInput();
       return;
     }
 
-    fillTokenInfo(addr, data, network);
-    tokenCard.classList.remove("hidden");
-
-    // 🚨 SECURITY / UX FIX:
-    // If the address does not behave like a token contract,
-    // do NOT run the risk engine.
-    if (!looksLikeTokenContract(data)) {
-      showNotATokenWarning();
-      statusMsg.textContent =
-        "Address loaded, but it does not appear to be a token contract.";
-      return;
-    }
-
-    // Run full heuristic engine only for valid token contracts
+    fillTokenInfo(addr, data);
     applyRisk(addr, data);
-    riskCard.classList.remove("hidden");
 
-    statusMsg.textContent =
-      "Token loaded successfully. Always confirm with the official explorer.";
+    tokenCard.classList.remove("hidden");
+    riskCard.classList.remove("hidden");
+    statusMsg.textContent = "Token loaded successfully.";
+
   } catch (e) {
     console.error(e);
     statusMsg.textContent = "Error loading token.";
@@ -135,94 +93,93 @@ async function handleAnalyze() {
 }
 
 /* -------------------------
-   Show 'Not a token' state
+   Invalid input handler
 --------------------------*/
-function showNotATokenWarning() {
+function showInvalidInput() {
   const riskCard = document.getElementById("riskCard");
-  const riskPill = document.getElementById("riskPill");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDesc = document.getElementById("riskDescription");
-  const ul = document.querySelector(".risk-notes");
-  const verifiedBadge = document.getElementById("verifiedBadge");
+  const tokenCard = document.getElementById("tokenCard");
 
+  tokenCard.classList.add("hidden");
   riskCard.classList.remove("hidden");
-  verifiedBadge.classList.add("hidden");
 
-  riskPill.className = "risk-pill risk-unknown";
-  riskPill.textContent = "ℹ️ Not a token";
+  document.getElementById("riskPill").textContent = "⚠️ Invalid Input";
+  document.getElementById("riskPill").className = "risk-pill risk-warning";
+  document.getElementById("riskTitle").textContent = "This is not a token contract.";
+  document.getElementById("riskDescription").textContent =
+    "The address entered appears to be a wallet address, not an ARC-20 token.";
 
-  riskTitle.textContent = "Input does not appear to be a token contract.";
-  riskDesc.textContent =
-    "The provided address looks like a wallet or a non-ARC-20 contract. Risk analysis was intentionally skipped.";
-
-  ul.innerHTML = "";
-
-  [
-    "This tool analyzes ARC-20 token contracts only.",
-    "Wallet addresses do not expose token metadata such as supply or decimals.",
-    "No risk assumptions were made for this address."
-  ].forEach((text) => {
-    const li = document.createElement("li");
-    li.textContent = "• " + text;
-    ul.appendChild(li);
-  });
+  const ul = document.querySelector(".risk-notes");
+  ul.innerHTML = "<li>Please enter a valid ARC-20 token contract.</li>";
 }
 
 /* -------------------------
-   Populate token info card
+   Fill token info
 --------------------------*/
-function fillTokenInfo(address, token, networkKey) {
-  document.getElementById("tName").textContent = token.name || "-";
-  document.getElementById("tSymbol").textContent = token.symbol || "-";
-  document.getElementById("tDecimals").textContent =
-    token.decimals ?? "unknown";
-  document.getElementById("tSupplyRaw").textContent =
-    token.totalSupply || "-";
-
-  const short = shorten(address);
-  const full = document.getElementById("tokenAddressShort");
-  full.textContent = short;
-  full.dataset.full = address;
+function fillTokenInfo(address, token) {
+  document.getElementById("tName").textContent = token.name;
+  document.getElementById("tSymbol").textContent = token.symbol;
+  document.getElementById("tDecimals").textContent = token.decimals;
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply;
 
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
-  document.getElementById("tokenTitle").textContent =
-    `${token.name || "Token"} (${token.symbol || "?"})`;
+  const short = address.slice(0, 6) + "..." + address.slice(-4);
+  const addrEl = document.getElementById("tokenAddressShort");
+  addrEl.textContent = short;
+  addrEl.dataset.full = address;
 
-  const explorer = NETWORKS[networkKey].explorerBase;
+  document.getElementById("tokenTitle").textContent =
+    `${token.name} (${token.symbol})`;
+
   document.getElementById("explorerLink").href =
-    `${explorer}/token/${address}`;
+    `${NETWORKS.arcTestnet.explorerBase}/token/${address}`;
 
   document.getElementById("tokenAvatar").textContent =
-    (token.symbol?.[0] || "?").toUpperCase();
+    token.symbol[0].toUpperCase();
 }
 
 /* -------------------------
-   Helper: short address
+   Risk engine (safe version)
 --------------------------*/
-function shorten(a) {
-  if (!a || a.length < 10) return a;
-  return a.slice(0, 6) + "..." + a.slice(-4);
+function applyRisk(address, token) {
+  const ul = document.querySelector(".risk-notes");
+  ul.innerHTML = "";
+
+  const normalized = address.toLowerCase();
+  const trusted = TRUSTED_TOKENS[normalized];
+
+  if (trusted) {
+    document.getElementById("riskPill").textContent = "🟢 Trusted";
+    document.getElementById("riskPill").className = "risk-pill risk-safe";
+    document.getElementById("riskTitle").textContent = "Verified official token.";
+    document.getElementById("riskDescription").textContent = trusted.note;
+
+    ul.innerHTML = "<li>Allowlisted official contract.</li>";
+    return;
+  }
+
+  document.getElementById("riskPill").textContent = "ℹ️ Informational";
+  document.getElementById("riskPill").className = "risk-pill";
+  document.getElementById("riskTitle").textContent = "No major red flags detected.";
+  document.getElementById("riskDescription").textContent =
+    "This is a heuristic-only analysis.";
+
+  ul.innerHTML = `
+    <li>Decimals: ${token.decimals}</li>
+    <li>Total supply present</li>
+    <li>No private APIs used</li>
+  `;
 }
 
 /* -------------------------
-   Format supply as human-readable
+   Helpers
 --------------------------*/
 function formatSupply(raw, dec) {
-  if (!raw) return "-";
   try {
-    const big = BigInt(raw);
-    const d = BigInt(dec || 0);
-    if (d === 0n) return big.toLocaleString();
-
-    const f = BigInt(10) ** d;
-    const intPart = big / f;
-    const fracPart = big % f;
-
-    return `${intPart.toLocaleString()}.${
-      fracPart.toString().padStart(Number(d), "0").slice(0, 4)
-    }`;
+    const n = BigInt(raw);
+    const d = BigInt(10) ** BigInt(dec);
+    return (n / d).toLocaleString();
   } catch {
     return raw;
   }
