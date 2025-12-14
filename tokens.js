@@ -1,16 +1,12 @@
-// Network configuration (UI shows Mainnet soon, but only Testnet is active for now.)
+// Configuração da rede
 const NETWORKS = {
   arcTestnet: {
     label: "ARC Testnet",
     explorerBase: "https://testnet.arcscan.app"
-  },
-  arcMainnet: {
-    label: "ARC Mainnet",
-    explorerBase: "https://arcscan.app"
   }
 };
 
-// Manual allowlist (only used to show "Verified token" badge + note)
+// Lista de tokens confiáveis (allowlist manual)
 const TRUSTED_TOKENS = {
   "0x3600000000000000000000000000000000000000": {
     label: "USDC",
@@ -21,7 +17,7 @@ const TRUSTED_TOKENS = {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("analyzeBtn").addEventListener("click", handleAnalyze);
-  document.getElementById("tokenAddress").addEventListener("keyup", (e) => {
+  document.getElementById("tokenAddress").addEventListener("keyup", e => {
     if (e.key === "Enter") handleAnalyze();
   });
 
@@ -29,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initCopy();
 });
 
+/* -------------------------
+   Tema (light/dark)
+--------------------------*/
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
   const body = document.body;
@@ -40,39 +39,61 @@ function initThemeToggle() {
   });
 }
 
+/* -------------------------
+   Copiar endereço
+--------------------------*/
 function initCopy() {
   const btn = document.getElementById("copyAddressBtn");
   btn.addEventListener("click", async () => {
-    const el = document.getElementById("tokenAddressShort");
-    const full = el?.dataset?.full;
+    const full = document.getElementById("tokenAddressShort")?.dataset.full;
     if (!full) return;
 
-    try {
-      await navigator.clipboard.writeText(full);
-      btn.textContent = "✔ Copied";
-      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-    } catch {
-      btn.textContent = "Error";
-      setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
-    }
+    await navigator.clipboard.writeText(full);
+    btn.textContent = "✔ Copied";
+    setTimeout(() => (btn.textContent = "📋 Copy"), 1000);
   });
 }
 
-function isValidAddress(a) {
-  return /^0x[a-fA-F0-9]{40}$/.test(a);
+/* -------------------------
+   Verificação de Contrato
+--------------------------*/
+async function isContractAddress(address) {
+  try {
+    // Chamada para ArcScan para verificar se o endereço tem bytecode
+    const res = await fetch(
+      `https://testnet.arcscan.app/api?module=proxy&action=eth_getCode&address=${address}&tag=latest`
+    );
+    const json = await res.json();
+
+    // Se o retorno não for "0x", é um contrato
+    if (json.result && json.result !== "0x") {
+      return true; // É um contrato válido
+    }
+
+    return false; // Caso contrário, é uma wallet ou contrato inválido
+  } catch (e) {
+    console.error("Erro ao verificar o contrato:", e);
+    return false; // Caso ocorra erro, trata como wallet
+  }
 }
 
-function setLoading(isLoading, text) {
-  const btn = document.getElementById("analyzeBtn");
-  const statusMsg = document.getElementById("statusMsg");
-
-  btn.disabled = isLoading;
-  btn.classList.toggle("is-loading", isLoading);
-
-  if (text) statusMsg.textContent = text;
+// Função para verificar se o endereço está listado como um token na ArcScan
+async function isTokenListed(address) {
+  try {
+    // Verifica se o endereço é um token registrado na ArcScan
+    const res = await fetch(`https://testnet.arcscan.app/api?module=token&action=getTokenInfo&address=${address}`);
+    const json = await res.json();
+    return json.result && json.result.status === "1"; // Se o token existir, retorna true
+  } catch (e) {
+    console.error("Erro ao verificar se o token está listado:", e);
+    return false;
+  }
 }
 
-function showInputError(kind, address) {
+/* -------------------------
+   Erro de Wallet
+--------------------------*/
+function showWalletInputError() {
   const riskCard = document.getElementById("riskCard");
   const tokenCard = document.getElementById("tokenCard");
   const explorerLink = document.getElementById("explorerLink");
@@ -80,163 +101,84 @@ function showInputError(kind, address) {
   tokenCard.classList.add("hidden");
   riskCard.classList.remove("hidden");
 
+  // Esconde o link do explorador para wallets
   if (explorerLink) explorerLink.style.display = "none";
 
-  const riskPill = document.getElementById("riskPill");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDesc = document.getElementById("riskDescription");
-  const ul = document.querySelector(".risk-notes");
-  const verifiedBadge = document.getElementById("verifiedBadge");
+  document.getElementById("riskPill").className = "risk-pill risk-warning";
+  document.getElementById("riskPill").textContent = "⚠️ Invalid input";
+  document.getElementById("riskTitle").textContent = "Wallet address detected.";
+  document.getElementById("riskDescription").textContent =
+    "This tool analyzes ARC-20 token contracts only.";
 
-  verifiedBadge.classList.add("hidden");
-  riskPill.className = "risk-pill risk-warning";
-  riskPill.textContent = "⚠️ Invalid input";
-
-  if (kind === "wallet") {
-    riskTitle.textContent = "Wallet address detected.";
-    riskDesc.textContent =
-      "This tool analyzes ARC-20 token contracts only. Wallet addresses are not supported.";
-    ul.innerHTML = `
-      <li>Please enter a valid ARC-20 contract address.</li>
-      <li>No token analysis was performed.</li>
-    `;
-    return;
-  }
-
-  if (kind === "nonTokenContract") {
-    riskTitle.textContent = "Contract detected, but not an ARC-20 token.";
-    riskDesc.textContent =
-      "The address has bytecode, but it doesn't behave like a standard token contract.";
-    ul.innerHTML = `
-      <li>Address: <span class="mono">${shorten(address)}</span></li>
-      <li>Please enter an ARC-20 token contract address.</li>
-    `;
-    return;
-  }
-
-  // default
-  riskTitle.textContent = "Invalid address.";
-  riskDesc.textContent = "Please paste a valid 0x address.";
-  ul.innerHTML = `<li>Expected format: 0x + 40 hex characters.</li>`;
+  document.querySelector(".risk-notes").innerHTML = `
+    <li>Please enter a valid ARC-20 contract address.</li>
+    <li>No token analysis was performed.</li>
+  `;
 }
 
+/* -------------------------
+   Função principal de análise
+--------------------------*/
 async function handleAnalyze() {
-  const input = document.getElementById("tokenAddress").value.trim();
-  const addr = input;
+  const addr = document.getElementById("tokenAddress").value.trim();
+  if (!addr.startsWith("0x")) return alert("Invalid address.");
 
-  const riskCard = document.getElementById("riskCard");
-  const tokenCard = document.getElementById("tokenCard");
+  const normalized = addr.toLowerCase();
+  const explorerLink = document.getElementById("explorerLink");
 
-  riskCard.classList.add("hidden");
-  tokenCard.classList.add("hidden");
+  // Resetando o estado do link do explorador
+  if (explorerLink) explorerLink.style.display = "none";
 
-  if (!isValidAddress(addr)) {
-    showInputError("invalid");
+  // Verificação de Wallet vs Contrato
+  const isContract = await isContractAddress(addr);
+  if (!isContract || !(await isTokenListed(addr))) {
+    showWalletInputError();
     return;
   }
 
-  const network = "arcTestnet"; // UI only; backend uses this too
-  setLoading(true, "Checking address on ARC Testnet...");
+  // Se for um contrato válido, prosseguir com a análise
+  const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
+  const data = await resp.json();
 
-  try {
-    // Backend does: eth_getCode + eth_call (no CORS issues)
-    const resp = await fetch(`/api/arc-token?address=${addr}&network=${network}`);
-    const data = await resp.json();
-
-    if (!data || !data.ok) {
-      setLoading(false, "Error loading token.");
-      showInputError("invalid");
-      return;
-    }
-
-    if (data.type === "wallet") {
-      setLoading(false, "Wallet address detected.");
-      showInputError("wallet", addr);
-      return;
-    }
-
-    if (data.type === "nonTokenContract") {
-      setLoading(false, "Not an ARC-20 token contract.");
-      showInputError("nonTokenContract", addr);
-      return;
-    }
-
-    if (data.type !== "token" || !data.token) {
-      setLoading(false, "Token not found.");
-      showInputError("invalid");
-      return;
-    }
-
-    // Render token + risk
-    fillTokenInfo(addr, data.token, network);
-    applyRisk(addr, data.token);
-
-    tokenCard.classList.remove("hidden");
-    riskCard.classList.remove("hidden");
-
-    setLoading(false, "Token loaded successfully. Always confirm with the official explorer.");
-  } catch (e) {
-    console.error(e);
-    setLoading(false, "Error loading token.");
-    showInputError("invalid");
+  if (!data || !data.name) {
+    alert("Token not found.");
+    return;
   }
+
+  fillTokenInfo(addr, data);
+  applyRisk(addr, data);
+
+  // Liberando o link de explorador
+  if (explorerLink) {
+    explorerLink.href = `https://testnet.arcscan.app/token/${addr}`;
+    explorerLink.textContent = "View on explorer ↗";
+    explorerLink.style.display = "inline";
+  }
+
+  document.getElementById("tokenCard").classList.remove("hidden");
+  document.getElementById("riskCard").classList.remove("hidden");
 }
 
-function fillTokenInfo(address, token, networkKey) {
+/* -------------------------
+   Preencher as informações do token
+--------------------------*/
+function fillTokenInfo(address, token) {
   document.getElementById("tName").textContent = token.name || "-";
   document.getElementById("tSymbol").textContent = token.symbol || "-";
-  document.getElementById("tDecimals").textContent =
-    token.decimals ?? "unknown";
-  document.getElementById("tSupplyRaw").textContent =
-    token.totalSupply ?? "-";
-
+  document.getElementById("tDecimals").textContent = token.decimals ?? "-";
+  document.getElementById("tSupplyRaw").textContent = token.totalSupply || "-";
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
-  const shortAddr = shorten(address);
+  const short = address.slice(0, 6) + "..." + address.slice(-4);
   const addrEl = document.getElementById("tokenAddressShort");
-  addrEl.textContent = shortAddr;
+  addrEl.textContent = short;
   addrEl.dataset.full = address;
-
-  const title = `${token.name || "Token"} (${token.symbol || "?"})`;
-  document.getElementById("tokenTitle").textContent = title;
-
-  const explorer = NETWORKS[networkKey].explorerBase;
-  const explorerLink = document.getElementById("explorerLink");
-  explorerLink.href = `${explorer}/token/${address}`;
-  explorerLink.style.display = "inline";
-
-  document.getElementById("tokenAvatar").textContent =
-    (token.symbol?.[0] || "?").toUpperCase();
 }
 
-function shorten(a) {
-  return a.slice(0, 6) + "..." + a.slice(-4);
-}
-
-function formatSupply(raw, dec) {
-  if (!raw && raw !== "0") return "-";
-  try {
-    const big = BigInt(raw);
-    const d = BigInt(dec ?? 0);
-    if (d === 0n) return big.toLocaleString();
-
-    const f = 10n ** d;
-    const intPart = big / f;
-    const fracPart = big % f;
-
-    return `${intPart.toLocaleString()}.${fracPart
-      .toString()
-      .padStart(Number(d), "0")
-      .slice(0, 4)}`;
-  } catch {
-    return String(raw);
-  }
-}
-
-/* ============================================================
-   RISK ENGINE (keeps your approach, but now token data is real)
-============================================================ */
+/* -------------------------
+   Aplicar análise de risco
+--------------------------*/
 function applyRisk(address, token) {
   const normalized = address.toLowerCase();
   const trusted = TRUSTED_TOKENS[normalized];
@@ -244,181 +186,37 @@ function applyRisk(address, token) {
   const riskPill = document.getElementById("riskPill");
   const riskTitle = document.getElementById("riskTitle");
   const riskDesc = document.getElementById("riskDescription");
-  const verifiedBadge = document.getElementById("verifiedBadge");
 
   riskPill.className = "risk-pill";
-  verifiedBadge.classList.add("hidden");
 
-  const breakdown = [];
-  let totalScore = 0;
-
-  // Allowlist badge (does NOT block other tokens)
   if (trusted) {
-    verifiedBadge.classList.remove("hidden");
-  }
-
-  // Decimals
-  let decimalsScore = 0;
-  const decimals = Number(token.decimals ?? 0);
-  if (Number.isNaN(decimals)) decimalsScore += 2;
-  else if (decimals > 18 || decimals === 0) decimalsScore += 2;
-
-  breakdown.push({
-    label: "Decimals",
-    score: decimalsScore,
-    icon: decimalsScore ? "⚠️" : "✅",
-    reason:
-      Number.isNaN(decimals)
-        ? "Token decimals could not be read."
-        : decimals === 0
-        ? "Token has 0 decimals — unusual for ERC-20 assets."
-        : decimals > 18
-        ? "Very high decimals — often used in misleading tokens."
-        : "Decimals appear normal."
-  });
-  totalScore += decimalsScore;
-
-  // Name / Symbol
-  let nameSymbolScore = 0;
-  const name = token.name || "";
-  const symbol = token.symbol || "";
-
-  if (!name || name.length < 3) nameSymbolScore += 1;
-  if (!symbol || symbol.length < 2 || symbol.length > 10) nameSymbolScore += 1;
-
-  breakdown.push({
-    label: "Name / Symbol",
-    score: nameSymbolScore,
-    icon: nameSymbolScore ? "⚠️" : "✅",
-    reason:
-      nameSymbolScore > 0
-        ? "Unusual name or symbol length/format."
-        : "Name and symbol look well-structured."
-  });
-  totalScore += nameSymbolScore;
-
-  // Impersonation (soft flag)
-  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "BNB", "ARB", "MATIC"];
-  let impersonationScore = 0;
-  if (symbol && famousSymbols.includes(symbol.toUpperCase()) && !trusted) {
-    impersonationScore += 2;
-  }
-  breakdown.push({
-    label: "Impersonation",
-    score: impersonationScore,
-    icon: impersonationScore ? "🚩" : "✅",
-    reason:
-      impersonationScore
-        ? `Symbol matches a well-known asset (${symbol}). Could be impersonation.`
-        : "No obvious impersonation indicators."
-  });
-  totalScore += impersonationScore;
-
-  // Supply
-  let supplyScore = 0;
-  let supply = 0n;
-  try {
-    supply = BigInt(token.totalSupply ?? "0");
-  } catch {
-    supplyScore += 2;
-  }
-
-  if (supply === 0n) supplyScore += 1;
-  if (supply > 10n ** 40n) supplyScore += 2;
-
-  breakdown.push({
-    label: "Total supply",
-    score: supplyScore,
-    icon: supplyScore ? "⚠️" : "✅",
-    reason:
-      supplyScore >= 2
-        ? "Supply is unreadable, zero, or extremely large."
-        : "Supply looks normal."
-  });
-  totalScore += supplyScore;
-
-  // Address pattern (low weight)
-  let addrScore = 0;
-  if (normalized.startsWith("0x000000")) addrScore += 1;
-  breakdown.push({
-    label: "Address pattern",
-    score: addrScore,
-    icon: addrScore ? "⚠️" : "✅",
-    reason:
-      addrScore ? "Contract starts with many zeros — sometimes deceptive." : "Nothing unusual about the address format."
-  });
-  totalScore += addrScore;
-
-  // Trusted tokens get a friendly summary but still show breakdown
-  if (trusted) {
-    breakdown.unshift({
-      label: "Trusted list",
-      score: 0,
-      icon: "🟢",
-      reason: trusted.note
-    });
-  }
-
-  // Final level
-  let level = "safe";
-  if (totalScore >= 7) level = "danger";
-  else if (totalScore >= 4) level = "warning";
-  else if (totalScore >= 2) level = "caution";
-
-  if (level === "safe") {
-    riskPill.textContent = trusted ? "🟢 Trusted" : "🟢 Likely Safe";
+    riskPill.textContent = "🟢 Trusted";
     riskPill.classList.add("risk-safe");
-    riskTitle.textContent = trusted ? "Allowlisted token." : "No major red flags detected.";
-    riskDesc.textContent =
-      trusted
-        ? "Allowlisted on this tool. Still verify via the official explorer."
-        : "Basic heuristics found no severe issues. Still not a safety guarantee.";
-  } else if (level === "caution") {
-    riskPill.textContent = "⚠️ Caution";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Minor unusual characteristics found.";
-    riskDesc.textContent = "Some metadata looks slightly off. Verify carefully.";
-  } else if (level === "warning") {
-    riskPill.textContent = "⚠️ Risky";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Several red flags detected.";
-    riskDesc.textContent = "Interact only if you fully understand the project and risks.";
-  } else {
-    riskPill.textContent = "🔥 High Risk";
-    riskPill.classList.add("risk-danger");
-    riskTitle.textContent = "Severe risk indicators detected.";
-    riskDesc.textContent = "Token appears extremely suspicious. Avoid interacting.";
+    riskTitle.textContent = "Trusted token";
+    riskDesc.textContent = trusted.note;
+
+    document.querySelector(".risk-notes").innerHTML = `
+      <li>Allowlisted official asset.</li>
+      <li>Still verify via official explorer.</li>
+    `;
+    return;
   }
 
-  renderRiskNotes(level, totalScore, breakdown);
+  riskPill.textContent = "⚠️ Risky";
+  riskPill.classList.add("risk-warning");
+  riskTitle.textContent = "Heuristic risk detected.";
+  riskDesc.textContent = "Token shows unusual characteristics.";
 }
 
-function renderRiskNotes(level, totalScore, breakdown) {
-  const ul = document.querySelector(".risk-notes");
-  if (!ul) return;
-
-  const levelLabel =
-    level === "safe" ? "Likely Safe" :
-    level === "caution" ? "Caution" :
-    level === "warning" ? "Risky" : "High Risk";
-
-  ul.innerHTML = "";
-
-  const headerLi = document.createElement("li");
-  headerLi.innerHTML = `<strong>Why this rating? (${levelLabel}, score ${totalScore})</strong>`;
-  ul.appendChild(headerLi);
-
-  breakdown.forEach((b) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${b.icon} <strong>${b.label}:</strong> ${b.reason}${b.score ? ` (score +${b.score})` : ""}`;
-    ul.appendChild(li);
-  });
-
-  const liHeuristic = document.createElement("li");
-  liHeuristic.textContent = "Heuristic only — always verify the contract manually.";
-  ul.appendChild(liHeuristic);
-
-  const liReadOnly = document.createElement("li");
-  liReadOnly.textContent = "Read-only analysis. No wallet connection required.";
-  ul.appendChild(liReadOnly);
+/* -------------------------
+   Funções auxiliares
+--------------------------*/
+function formatSupply(raw, dec) {
+  try {
+    const v = BigInt(raw);
+    const d = BigInt(dec);
+    return (v / 10n ** d).toLocaleString();
+  } catch {
+    return "-";
+  }
 }
