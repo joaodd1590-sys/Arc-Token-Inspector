@@ -1,107 +1,107 @@
+// /api/arc-token.js
+
+const RPC_URL = "https://testnet.arc.io/rpc"; // <-- RPC da ARC Testnet
+
+const ERC20_ABI = [
+  {
+    name: "name",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }]
+  },
+  {
+    name: "symbol",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }]
+  },
+  {
+    name: "decimals",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint8" }]
+  },
+  {
+    name: "totalSupply",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }]
+  }
+];
+
+async function ethCall(address, data) {
+  const res = await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to: address, data }, "latest"]
+    })
+  });
+
+  const json = await res.json();
+  return json.result || null;
+}
+
+// very small encoder (no ethers.js needed)
+function encodeSig(sig) {
+  return "0x" + require("crypto").createHash("keccak256").update(sig).digest("hex").slice(0, 8);
+}
+
 export default async function handler(req, res) {
+  const address = req.query.address;
+
+  if (!address || !address.startsWith("0x")) {
+    return res.status(400).json({ error: "Invalid address" });
+  }
+
+  let isToken = false;
+  const token = {};
+
   try {
-    const { address, network } = req.query;
-    const addr = String(address || "").trim();
-
-    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-      return res.status(400).json({ ok: false, error: "invalid_address" });
+    // name()
+    const name = await ethCall(address, encodeSig("name()"));
+    if (name && name !== "0x") {
+      token.name = Buffer.from(name.slice(2), "hex").toString().replace(/\0/g, "");
+      isToken = true;
     }
 
-    // For now: only ARC Testnet
-    const explorerBase = "https://testnet.arcscan.app";
-
-    // 1) Contract vs wallet using eth_getCode
-    const codeResp = await fetch(
-      `${explorerBase}/api?module=proxy&action=eth_getCode&address=${addr}&tag=latest`,
-      { headers: { "accept": "application/json" } }
-    );
-
-    const codeJson = await codeResp.json();
-    const code = (codeJson && codeJson.result) ? String(codeJson.result) : "0x";
-
-    if (!code || code === "0x") {
-      return res.status(200).json({ ok: true, type: "wallet" });
+    // symbol()
+    const symbol = await ethCall(address, encodeSig("symbol()"));
+    if (symbol && symbol !== "0x") {
+      token.symbol = Buffer.from(symbol.slice(2), "hex").toString().replace(/\0/g, "");
+      isToken = true;
     }
 
-    // 2) Try ERC-20 reads via eth_call
-    const [name, symbol, decimals, totalSupply] = await Promise.all([
-      ethCallString(explorerBase, addr, "0x06fdde03"), // name()
-      ethCallString(explorerBase, addr, "0x95d89b41"), // symbol()
-      ethCallUint(explorerBase, addr, "0x313ce567"),   // decimals()
-      ethCallUint(explorerBase, addr, "0x18160ddd")    // totalSupply()
-    ]);
-
-    const looksLikeToken =
-      (typeof symbol === "string" && symbol.length > 0) ||
-      (typeof name === "string" && name.length > 0);
-
-    if (!looksLikeToken) {
-      return res.status(200).json({ ok: true, type: "nonTokenContract" });
+    // decimals()
+    const decimals = await ethCall(address, encodeSig("decimals()"));
+    if (decimals && decimals !== "0x") {
+      token.decimals = parseInt(decimals, 16);
+      isToken = true;
     }
 
-    return res.status(200).json({
-      ok: true,
-      type: "token",
-      token: {
-        name: name || "",
-        symbol: symbol || "",
-        decimals: decimals ?? null,
-        totalSupply: totalSupply ?? null
-      }
-    });
+    // totalSupply()
+    const supply = await ethCall(address, encodeSig("totalSupply()"));
+    if (supply && supply !== "0x") {
+      token.totalSupply = BigInt(supply).toString();
+      isToken = true;
+    }
   } catch (e) {
-    console.error("arc-token api error:", e);
-    return res.status(500).json({ ok: false, error: "server_error" });
+    console.error(e);
   }
-}
 
-async function ethCall(explorerBase, to, data) {
-  const url = `${explorerBase}/api?module=proxy&action=eth_call&to=${to}&data=${data}&tag=latest`;
-  const r = await fetch(url, { headers: { "accept": "application/json" } });
-  const j = await r.json();
-  return j && j.result ? String(j.result) : "0x";
-}
-
-async function ethCallUint(explorerBase, to, data) {
-  try {
-    const hex = await ethCall(explorerBase, to, data);
-    if (!hex || hex === "0x") return null;
-    // strip 0x, parse as BigInt
-    const v = BigInt(hex);
-    // decimals fits number; totalSupply might be huge -> return string
-    if (data === "0x313ce567") return Number(v);
-    return v.toString();
-  } catch {
-    return null;
+  if (!isToken) {
+    return res.json({ isToken: false });
   }
-}
 
-async function ethCallString(explorerBase, to, data) {
-  try {
-    const hex = await ethCall(explorerBase, to, data);
-    if (!hex || hex === "0x") return "";
-
-    // Try decode as ABI string (dynamic)
-    // Layout: 0x + [offset(32)] + [len(32)] + [bytes...]
-    const buf = Buffer.from(hex.slice(2), "hex");
-    if (buf.length < 64) return "";
-
-    const offset = Number(readUint256(buf, 0));
-    if (!Number.isFinite(offset) || offset + 32 > buf.length) return "";
-
-    const len = Number(readUint256(buf, offset));
-    if (!Number.isFinite(len) || offset + 32 + len > buf.length) return "";
-
-    const strBytes = buf.subarray(offset + 32, offset + 32 + len);
-    return strBytes.toString("utf8").replace(/\0/g, "");
-  } catch {
-    return "";
-  }
-}
-
-function readUint256(buf, start) {
-  const slice = buf.subarray(start, start + 32);
-  let hex = slice.toString("hex");
-  if (!hex) return 0n;
-  return BigInt("0x" + hex);
+  return res.json({
+    isToken: true,
+    ...token
+  });
 }
