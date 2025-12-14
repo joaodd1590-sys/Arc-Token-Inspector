@@ -62,13 +62,6 @@ async function handleAnalyze() {
 
     fillTokenInfo(addr, token);
     applyRisk(token);
-
-    // 🔒 V3 / V4 / V5 IMPLEMENTADAS
-    // ❌ NÃO exibidas (Mainnet only)
-    // renderV3Capabilities();
-    // renderV4Advanced();
-    // renderV5Execution();
-
     showSuccess(addr);
 
   } catch (e) {
@@ -87,6 +80,7 @@ function resetUI() {
 
 function showLoading() {
   document.getElementById("riskCard")?.classList.remove("hidden");
+
   document.getElementById("riskPill").className = "risk-pill risk-unknown";
   document.getElementById("riskPill").textContent = "⏳ Loading";
   document.getElementById("riskTitle").textContent = "Analyzing address…";
@@ -97,27 +91,29 @@ function showLoading() {
 
 function showNotTokenError() {
   document.getElementById("riskCard")?.classList.remove("hidden");
+
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
   document.getElementById("riskTitle").textContent =
     "Address is not an ARC-20 token";
   document.getElementById("riskDescription").textContent =
-    "This address does not appear in the ARC Testnet token registry.";
+    "This address does not appear to be a valid ARC token contract.";
 
   document.querySelector(".risk-notes").innerHTML = `
     <li>Likely a wallet or non-token contract.</li>
-    <li>Only ARC-20 token contracts can be analyzed.</li>
+    <li>Only ARC-20 token contracts are supported.</li>
   `;
 }
 
 function showGenericError() {
   document.getElementById("riskCard")?.classList.remove("hidden");
+
   document.getElementById("riskPill").className = "risk-pill risk-danger";
   document.getElementById("riskPill").textContent = "❌ Error";
   document.getElementById("riskTitle").textContent =
     "Unable to analyze address.";
   document.getElementById("riskDescription").textContent =
-    "Unexpected error occurred.";
+    "Unexpected network or RPC error.";
 }
 
 function showSuccess(address) {
@@ -164,7 +160,7 @@ function fillTokenInfo(address, token) {
 }
 
 /* =========================
-   RISK ENGINE
+   RISK ENGINE — FINAL
 ========================= */
 function applyRisk(token) {
   const pill = document.getElementById("riskPill");
@@ -175,51 +171,66 @@ function applyRisk(token) {
   let score = 0;
   notes.innerHTML = "";
 
-  if (token.decimals === 0 || token.decimals == null) {
-    score++;
-    notes.innerHTML += `<li>⚠️ Unusual decimals</li>`;
+  // Decimals
+  if (token.decimals == null) {
+    score += 2;
+    notes.innerHTML += `<li>⚠️ Token does not report decimals</li>`;
+  } else if (token.decimals === 0) {
+    score += 1;
+    notes.innerHTML += `<li>⚠️ Token uses 0 decimals (non-standard)</li>`;
+  } else if (token.decimals > 18) {
+    score += 1;
+    notes.innerHTML += `<li>⚠️ Unusually high decimals</li>`;
   }
 
+  // Supply
   if (!token.totalSupply || token.totalSupply === "0") {
-    score++;
-    notes.innerHTML += `<li>⚠️ Total supply unavailable</li>`;
+    score += 2;
+    notes.innerHTML += `<li>⚠️ Total supply unavailable or zero</li>`;
+  } else {
+    try {
+      const supply = BigInt(token.totalSupply);
+      if (supply > 10n ** 30n) {
+        score += 1;
+        notes.innerHTML += `<li>⚠️ Extremely large total supply</li>`;
+      }
+    } catch {
+      score += 1;
+      notes.innerHTML += `<li>⚠️ Total supply could not be parsed</li>`;
+    }
   }
 
+  // Metadata
+  if (!token.name) {
+    score += 1;
+    notes.innerHTML += `<li>⚠️ Token name is missing</li>`;
+  }
+
+  if (!token.symbol) {
+    score += 1;
+    notes.innerHTML += `<li>⚠️ Token symbol is missing</li>`;
+  }
+
+  // Verdict
   if (score === 0) {
     pill.textContent = "🟢 Likely Safe";
     pill.className = "risk-pill risk-safe";
-    title.textContent = "No major red flags detected.";
-    desc.textContent = "Token metadata looks standard.";
-  } else {
-    pill.textContent = "⚠️ Risky";
+    title.textContent = "No major red flags detected";
+    desc.textContent =
+      "Token metadata follows common ARC-20 standards.";
+  } else if (score <= 2) {
+    pill.textContent = "⚠️ Potential Risk";
     pill.className = "risk-pill risk-warning";
-    title.textContent = "Some risk indicators detected.";
-    desc.textContent = "Review metadata carefully.";
+    title.textContent = "Some anomalies detected";
+    desc.textContent =
+      "Token shows non-standard or incomplete metadata.";
+  } else {
+    pill.textContent = "❌ High Risk";
+    pill.className = "risk-pill risk-danger";
+    title.textContent = "Multiple red flags detected";
+    desc.textContent =
+      "Token metadata is incomplete or highly unusual.";
   }
-}
-
-/* =========================
-   V3 – CONTRACT CAPABILITIES
-   (Mainnet only – prepared)
-========================= */
-function renderV3Capabilities() {
-  /* Implementado para Mainnet */
-}
-
-/* =========================
-   V4 – ADVANCED ANALYSIS
-   (Mainnet only – prepared)
-========================= */
-function renderV4Advanced() {
-  /* Implementado para Mainnet */
-}
-
-/* =========================
-   V5 – EXECUTION & PERMISSIONS
-   (Mainnet only – prepared)
-========================= */
-function renderV5Execution() {
-  /* Implementado para Mainnet */
 }
 
 /* =========================
