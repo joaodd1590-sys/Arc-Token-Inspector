@@ -1,113 +1,73 @@
-/**
- * Address detection utility
- *
- * Correctly distinguishes between:
- * - Wallet (EOA)
- * - Non-token contracts
- * - ERC-20 token contracts
- *
- * This implementation is hardened against:
- * - Zero-filled RPC responses
- * - Inconsistent eth_call / eth_getCode behavior
- * - False positives caused by buggy RPCs
- */
+const ARC_RPC = "https://testnet.arc-rpc.io"; // ajuste se necessário
 
-// Minimal ERC-20 selectors
-const ERC20_SELECTORS = {
-  name: "0x06fdde03",
-  symbol: "0x95d89b41",
-  decimals: "0x313ce567",
-  totalSupply: "0x18160ddd"
-};
-
-// ---------- RPC helper ----------
 async function rpc(method, params = []) {
-  const res = await fetch("https://testnet.arcscan.app/api", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      params
-    })
-  });
-
-  const json = await res.json();
-  return json.result;
-}
-
-// ---------- Helper: meaningful hex ----------
-function isMeaningfulHex(hex) {
-  if (!hex || hex === "0x") return false;
-
-  const stripped = hex.startsWith("0x") ? hex.slice(2) : hex;
-  if (stripped.length === 0) return false;
-
-  // Reject zero-filled responses (0000...)
-  return !/^0+$/.test(stripped);
-}
-
-// ---------- ERC-20 call check ----------
-async function callERC20(address, selector) {
   try {
-    const result = await rpc("eth_call", [
-      { to: address, data: selector },
-      "latest"
-    ]);
+    const res = await fetch(ARC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method,
+        params
+      })
+    });
 
-    // Accept only meaningful, non-zero responses
-    return isMeaningfulHex(result);
+    const json = await res.json();
+    if (json.error) return null;
+    return json.result ?? null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-// ---------- Main detection ----------
-export async function detectAddressType(address) {
+function isZeroHex(hex) {
+  if (!hex || hex === "0x") return true;
+  return /^0x0+$/.test(hex);
+}
+
+async function call(address, selector) {
+  const res = await rpc("eth_call", [
+    { to: address, data: selector },
+    "latest"
+  ]);
+
+  if (!res || isZeroHex(res)) return null;
+  return res;
+}
+
+export default async function handler(req, res) {
+  const { address } = req.query;
+
   if (!address || !address.startsWith("0x")) {
-    return { type: "invalid" };
+    return res.json({ ok: false, type: "invalid" });
   }
 
-  /* ------------------------------------------------
-     1) Check if address has bytecode
-  --------------------------------------------------*/
-  let code;
-  try {
-    code = await rpc("eth_getCode", [address, "latest"]);
-  } catch {
-    return { type: "unknown" };
+  /* 1️⃣ BYTECODE CHECK */
+  const code = await rpc("eth_getCode", [address, "latest"]);
+  if (!code || isZeroHex(code)) {
+    return res.json({ ok: true, type: "wallet" });
   }
 
-  const normalizedCode = (code || "0x").toLowerCase().trim();
+  /* 2️⃣ ERC-20 CHECK */
+  const name = await call(address, "0x06fdde03");       // name()
+  const symbol = await call(address, "0x95d89b41");     // symbol()
+  const decimals = await call(address, "0x313ce567");   // decimals()
+  const supply = await call(address, "0x18160ddd");     // totalSupply()
 
-  // Wallet / EOA → no bytecode
-  if (
-    !normalizedCode ||
-    normalizedCode === "0x" ||
-    /^0x0+$/.test(normalizedCode)
-  ) {
-    return { type: "wallet" };
+  const erc20Score = [name, symbol, decimals, supply].filter(Boolean).length;
+
+  if (erc20Score >= 2) {
+    return res.json({ ok: true, type: "erc20" });
   }
 
-  /* ------------------------------------------------
-     2) Check ERC-20 interface heuristically
-     (at least 2 valid responses required)
-  --------------------------------------------------*/
-  let hits = 0;
+  /* 3️⃣ ERC-721 CHECK (NFT) */
+  const ownerOf = await call(address, "0x6352211e"); // ownerOf(uint256)
 
-  for (const selector of Object.values(ERC20_SELECTORS)) {
-    const ok = await callERC20(address, selector);
-    if (ok) hits++;
+  if (ownerOf) {
+    return res.json({ ok: true, type: "erc721" });
   }
 
-  // Threshold: require multiple ERC-20 signals
-  if (hits >= 2) {
-    return { type: "token" };
-  }
-
-  /* ------------------------------------------------
-     3) Contract, but not ERC-20
-  --------------------------------------------------*/
-  return { type: "contract" };
+  /* 4️⃣ OTHER CONTRACT */
+  return res.json({ ok: true, type: "contract" });
 }
