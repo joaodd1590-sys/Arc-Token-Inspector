@@ -55,7 +55,7 @@ function initCopy() {
 }
 
 /* -------------------------
-   Contract detection
+   Contract detection (wallet vs contract)
 --------------------------*/
 async function isContractAddress(address) {
   try {
@@ -70,14 +70,18 @@ async function isContractAddress(address) {
 }
 
 /* -------------------------
-   Wallet input error
+   Wallet input handling
 --------------------------*/
 function showWalletInputError() {
   const riskCard = document.getElementById("riskCard");
   const tokenCard = document.getElementById("tokenCard");
+  const explorerLink = document.getElementById("explorerLink");
 
   tokenCard.classList.add("hidden");
   riskCard.classList.remove("hidden");
+
+  // Hide explorer link for wallets
+  if (explorerLink) explorerLink.style.display = "none";
 
   document.getElementById("riskPill").className = "risk-pill risk-warning";
   document.getElementById("riskPill").textContent = "⚠️ Invalid input";
@@ -99,7 +103,12 @@ async function handleAnalyze() {
   if (!addr.startsWith("0x")) return alert("Invalid address.");
 
   const normalized = addr.toLowerCase();
+  const explorerLink = document.getElementById("explorerLink");
 
+  // Reset explorer link state
+  if (explorerLink) explorerLink.style.display = "none";
+
+  // Wallet vs contract detection (trusted tokens bypass this)
   if (!TRUSTED_TOKENS[normalized]) {
     const isContract = await isContractAddress(addr);
     if (!isContract) {
@@ -111,8 +120,20 @@ async function handleAnalyze() {
   const resp = await fetch(`/api/arc-token?address=${addr}&network=arcTestnet`);
   const data = await resp.json();
 
+  if (!data || !data.name) {
+    alert("Token not found.");
+    return;
+  }
+
   fillTokenInfo(addr, data);
   applyRisk(addr, data);
+
+  // Enable explorer link ONLY for valid token contracts
+  if (explorerLink) {
+    explorerLink.href = `${NETWORKS.arcTestnet.explorerBase}/token/${addr}`;
+    explorerLink.textContent = "View on explorer ↗";
+    explorerLink.style.display = "inline";
+  }
 
   document.getElementById("tokenCard").classList.remove("hidden");
   document.getElementById("riskCard").classList.remove("hidden");
@@ -129,13 +150,14 @@ function fillTokenInfo(address, token) {
   document.getElementById("tSupplyHuman").textContent =
     formatSupply(token.totalSupply, token.decimals);
 
-  document.getElementById("tokenAddressShort").textContent =
-    address.slice(0, 6) + "..." + address.slice(-4);
-  document.getElementById("tokenAddressShort").dataset.full = address;
+  const short = address.slice(0, 6) + "..." + address.slice(-4);
+  const addrEl = document.getElementById("tokenAddressShort");
+  addrEl.textContent = short;
+  addrEl.dataset.full = address;
 }
 
 /* -------------------------
-   Risk engine (COMPLETO)
+   Risk engine (unchanged logic)
 --------------------------*/
 function applyRisk(address, token) {
   const normalized = address.toLowerCase();
