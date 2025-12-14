@@ -65,6 +65,20 @@ function initCopy() {
 }
 
 /* -------------------------
+   Helper: semantic token check
+--------------------------*/
+// Checks if the returned metadata actually looks like an ARC-20 token contract
+function looksLikeTokenContract(token) {
+  return (
+    token &&
+    token.decimals !== null &&
+    token.decimals !== undefined &&
+    token.totalSupply !== null &&
+    token.totalSupply !== undefined
+  );
+}
+
+/* -------------------------
    Main "Analyze" handler
 --------------------------*/
 async function handleAnalyze() {
@@ -90,21 +104,68 @@ async function handleAnalyze() {
     const data = await resp.json();
 
     if (!data || !data.name) {
-      statusMsg.textContent = "Token not found.";
+      statusMsg.textContent =
+        "No ARC-20 token metadata found for this address.";
       return;
     }
 
     fillTokenInfo(addr, data, network);
-    applyRisk(addr, data); // full heuristic engine
-
     tokenCard.classList.remove("hidden");
+
+    // 🚨 SECURITY / UX FIX:
+    // If the address does not behave like a token contract,
+    // do NOT run the risk engine.
+    if (!looksLikeTokenContract(data)) {
+      showNotATokenWarning();
+      statusMsg.textContent =
+        "Address loaded, but it does not appear to be a token contract.";
+      return;
+    }
+
+    // Run full heuristic engine only for valid token contracts
+    applyRisk(addr, data);
     riskCard.classList.remove("hidden");
+
     statusMsg.textContent =
       "Token loaded successfully. Always confirm with the official explorer.";
   } catch (e) {
     console.error(e);
     statusMsg.textContent = "Error loading token.";
   }
+}
+
+/* -------------------------
+   Show 'Not a token' state
+--------------------------*/
+function showNotATokenWarning() {
+  const riskCard = document.getElementById("riskCard");
+  const riskPill = document.getElementById("riskPill");
+  const riskTitle = document.getElementById("riskTitle");
+  const riskDesc = document.getElementById("riskDescription");
+  const ul = document.querySelector(".risk-notes");
+  const verifiedBadge = document.getElementById("verifiedBadge");
+
+  riskCard.classList.remove("hidden");
+  verifiedBadge.classList.add("hidden");
+
+  riskPill.className = "risk-pill risk-unknown";
+  riskPill.textContent = "ℹ️ Not a token";
+
+  riskTitle.textContent = "Input does not appear to be a token contract.";
+  riskDesc.textContent =
+    "The provided address looks like a wallet or a non-ARC-20 contract. Risk analysis was intentionally skipped.";
+
+  ul.innerHTML = "";
+
+  [
+    "This tool analyzes ARC-20 token contracts only.",
+    "Wallet addresses do not expose token metadata such as supply or decimals.",
+    "No risk assumptions were made for this address."
+  ].forEach((text) => {
+    const li = document.createElement("li");
+    li.textContent = "• " + text;
+    ul.appendChild(li);
+  });
 }
 
 /* -------------------------
@@ -165,259 +226,4 @@ function formatSupply(raw, dec) {
   } catch {
     return raw;
   }
-}
-
-/* ============================================================
-     FULL RISK ENGINE (NO GRAPHS, ONLY TEXTUAL BREAKDOWN)
-   ============================================================ */
-function applyRisk(address, token) {
-  const normalized = address.toLowerCase();
-  const trusted = TRUSTED_TOKENS[normalized];
-
-  const riskPill = document.getElementById("riskPill");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDesc = document.getElementById("riskDescription");
-  const verifiedBadge = document.getElementById("verifiedBadge");
-
-  // reset visual state
-  riskPill.className = "risk-pill";
-  verifiedBadge.classList.add("hidden");
-
-  const breakdown = [];
-  let totalScore = 0;
-
-  /* ------------------------------------------------
-     If token is allowlisted → automatically Trusted
-  --------------------------------------------------*/
-  if (trusted) {
-    riskPill.textContent = "🟢 Trusted";
-    riskPill.classList.add("risk-safe");
-    verifiedBadge.classList.remove("hidden");
-
-    riskTitle.textContent = `${token.symbol || "Token"} is allowlisted.`;
-    riskDesc.textContent =
-      trusted.note + " · Still, always verify links and metadata.";
-
-    breakdown.push({
-      label: "Trusted list",
-      score: 0,
-      icon: "🟢",
-      reason: "This contract is explicitly listed as an official asset."
-    });
-
-    renderRiskNotes("safe", totalScore, breakdown);
-    return;
-  }
-
-  /* ------------------------------------------------
-     DECIMALS CHECK
-  --------------------------------------------------*/
-  let decimalsScore = 0;
-  const decimals = Number(token.decimals || 0);
-
-  if (decimals > 18 || decimals === 0) decimalsScore += 2;
-
-  breakdown.push({
-    label: "Decimals",
-    score: decimalsScore,
-    icon: decimalsScore ? "⚠️" : "✅",
-    reason:
-      decimals === 0
-        ? "Token has 0 decimals — unusual for ERC-20 assets."
-        : decimals > 18
-        ? "Very high decimals — often used in misleading tokens."
-        : "Decimals appear normal."
-  });
-
-  totalScore += decimalsScore;
-
-  /* ------------------------------------------------
-     NAME / SYMBOL QUALITY
-  --------------------------------------------------*/
-  let nameSymbolScore = 0;
-  const name = token.name || "";
-  const symbol = token.symbol || "";
-
-  if (!name || name.length < 3) nameSymbolScore += 1;
-  if (!symbol || symbol.length < 2 || symbol.length > 8) nameSymbolScore += 1;
-
-  breakdown.push({
-    label: "Name / Symbol",
-    score: nameSymbolScore,
-    icon: nameSymbolScore ? "⚠️" : "✅",
-    reason:
-      nameSymbolScore > 0
-        ? "Unusual name or symbol length/format."
-        : "Name and symbol look well-structured."
-  });
-
-  /* ------------------------------------------------
-     IMPERSONATION ATTEMPT (famous symbols)
-  --------------------------------------------------*/
-  const famousSymbols = ["USDC", "USDT", "ETH", "BTC", "BNB", "ARB", "MATIC"];
-  let impersonationScore = 0;
-
-  if (famousSymbols.includes(symbol.toUpperCase())) {
-    impersonationScore += 3;
-  }
-
-  breakdown.push({
-    label: "Impersonation",
-    score: impersonationScore,
-    icon: impersonationScore ? "🚩" : "✅",
-    reason:
-      impersonationScore > 0
-        ? `Symbol matches a well-known asset (${symbol}). Could be impersonation.`
-        : "No impersonation indicators."
-  });
-
-  totalScore += nameSymbolScore + impersonationScore;
-
-  /* ------------------------------------------------
-     SUPPLY CHECK
-  --------------------------------------------------*/
-  let supplyScore = 0;
-  const supplyStr = token.totalSupply || "0";
-  let supply = 0n;
-  try {
-    supply = BigInt(supplyStr);
-  } catch {}
-
-  if (supply === 0n) supplyScore += 2;
-  if (supply > 10n ** 40n) supplyScore += 2;
-
-  breakdown.push({
-    label: "Total supply",
-    score: supplyScore,
-    icon: supplyScore ? "⚠️" : "✅",
-    reason:
-      supply === 0n
-        ? "Total supply is zero — token may be broken."
-        : supply > 10n ** 40n
-        ? "Extremely large supply — common red flag."
-        : "Supply looks normal."
-  });
-
-  totalScore += supplyScore;
-
-  /* ------------------------------------------------
-     ADDRESS PATTERN
-  --------------------------------------------------*/
-  let addrScore = 0;
-  if (normalized.startsWith("0x000000")) addrScore += 2;
-
-  breakdown.push({
-    label: "Address pattern",
-    score: addrScore,
-    icon: addrScore ? "⚠️" : "✅",
-    reason:
-      addrScore > 0
-        ? "Contract starts with many zeros — often vanity or deceptive patterns."
-        : "Nothing unusual about the address format."
-  });
-
-  totalScore += addrScore;
-
-  /* ------------------------------------------------
-     PLACEHOLDER CHECKS (Testnet limitations)
-  --------------------------------------------------*/
-
-  breakdown.push({
-    label: "Contract verification",
-    score: 0,
-    icon: "ℹ️",
-    reason: "Testnet API does not expose verification status."
-  });
-
-  breakdown.push({
-    label: "Honeypot checks",
-    score: 0,
-    icon: "ℹ️",
-    reason: "Honeypot simulation is not available on testnet."
-  });
-
-  breakdown.push({
-    label: "Creation age",
-    score: 0,
-    icon: "ℹ️",
-    reason: "Contract age info unavailable on this endpoint."
-  });
-
-  /* ------------------------------------------------
-     RISK LEVEL BY SCORE
-  --------------------------------------------------*/
-  let level = "safe";
-  if (totalScore >= 8) level = "danger";
-  else if (totalScore >= 4) level = "warning";
-  else if (totalScore >= 1) level = "caution";
-
-  if (level === "safe") {
-    riskPill.textContent = "🟢 Likely Safe";
-    riskPill.classList.add("risk-safe");
-    riskTitle.textContent = "No major red flags detected.";
-    riskDesc.textContent =
-      "Basic heuristics found no severe issues. Still not a safety guarantee.";
-  } else if (level === "caution") {
-    riskPill.textContent = "⚠️ Caution";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Minor unusual characteristics found.";
-    riskDesc.textContent =
-      "Some elements (decimals, naming, supply) look slightly off.";
-  } else if (level === "warning") {
-    riskPill.textContent = "⚠️ Risky";
-    riskPill.classList.add("risk-warning");
-    riskTitle.textContent = "Several red flags detected.";
-    riskDesc.textContent =
-      "Interact only if you fully understand the project and risks.";
-  } else {
-    riskPill.textContent = "🔥 High Risk";
-    riskPill.classList.add("risk-danger", "glow-danger");
-    riskTitle.textContent = "Severe risk indicators detected.";
-    riskDesc.textContent =
-      "Token appears extremely suspicious. Avoid interacting.";
-  }
-
-  renderRiskNotes(level, totalScore, breakdown);
-}
-
-/* ------------------------------------------------
-   Render bullet list: "Why this rating?"
---------------------------------------------------*/
-function renderRiskNotes(level, totalScore, breakdown) {
-  const ul = document.querySelector(".risk-notes");
-  if (!ul) return;
-
-  let levelLabel =
-    level === "safe"
-      ? "Likely Safe"
-      : level === "caution"
-      ? "Caution"
-      : level === "warning"
-      ? "Risky"
-      : "High Risk";
-
-  ul.innerHTML = "";
-
-  const headerLi = document.createElement("li");
-  headerLi.innerHTML = `<strong>Why this rating? (${levelLabel}, score ${totalScore})</strong>`;
-  ul.appendChild(headerLi);
-
-  breakdown.forEach((b) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${b.icon} <strong>${b.label}:</strong> ${b.reason} ${
-      b.score ? `(score +${b.score})` : ""
-    }`;
-    ul.appendChild(li);
-  });
-
-  // Standard disclaimers
-  const liHeuristic = document.createElement("li");
-  liHeuristic.textContent =
-    "Heuristic only — always verify the contract manually.";
-  ul.appendChild(liHeuristic);
-
-  const liPublic = document.createElement("li");
-  liPublic.textContent =
-    "No private APIs used, only public on-chain metadata.";
-  ul.appendChild(liPublic);
 }
