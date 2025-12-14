@@ -420,4 +420,4 @@ function renderRiskNotes(level, totalScore, breakdown) {
   liPublic.textContent =
     "No private APIs used, only public on-chain metadata.";
   ul.appendChild(liPublic);
-}esse e meu attual js faz as modificaçoes de segurança sem quebarar nd
+}
