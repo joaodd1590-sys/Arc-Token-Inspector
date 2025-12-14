@@ -47,13 +47,7 @@ body {
   max-width: 960px;
   margin: 40px auto 30px;
   padding: 0 16px;
-  position: relative;
-  z-index: 1;
 }
-
-.hidden { display: none !important; }
-
-.mono { font-family: var(--mono); }
 
 /* ==================================================
    HEADER
@@ -174,10 +168,13 @@ body[data-theme="light"] .input-wrapper input {
   cursor: pointer;
   background: var(--accent);
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.input-wrapper button:hover { filter: brightness(1.06); }
+.input-wrapper button.is-loading {
+  opacity: 0.75;
+  cursor: wait;
+}
 
 .input-tip {
   margin-top: 8px;
@@ -185,8 +182,10 @@ body[data-theme="light"] .input-wrapper input {
   color: var(--text-muted);
 }
 
+.mono { font-family: var(--mono); }
+
 /* ==================================================
-   GRID
+   GRID / CARDS
 ================================================== */
 
 .cards-grid {
@@ -200,10 +199,6 @@ body[data-theme="light"] .input-wrapper input {
   .cards-grid { grid-template-columns: 1fr; }
 }
 
-/* ==================================================
-   CARDS
-================================================== */
-
 .card {
   background: var(--bg-card);
   border-radius: 18px;
@@ -212,20 +207,23 @@ body[data-theme="light"] .input-wrapper input {
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.9);
 }
 
-/* ================= RISK ================= */
+.hidden { display: none !important; }
+
+/* ==================================================
+   RISK
+================================================== */
 
 .risk-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
 }
 
 .risk-pill {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .risk-unknown { color: var(--unknown); }
@@ -233,20 +231,16 @@ body[data-theme="light"] .input-wrapper input {
 .risk-warning { color: var(--warning); }
 .risk-danger { color: var(--danger); }
 
-.glow-danger { text-shadow: 0 0 18px rgba(255, 75, 92, 0.45); }
-
 .verified-badge {
+  font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--safe);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card-soft);
+  color: var(--text-muted);
 }
 
-.risk-title { font-weight: 800; margin-top: 10px; }
-.risk-description { margin-top: 6px; }
+.risk-title { font-weight: 600; }
 
 .risk-description,
 .risk-notes {
@@ -254,14 +248,9 @@ body[data-theme="light"] .input-wrapper input {
   color: var(--text-muted);
 }
 
-.risk-notes {
-  margin: 10px 0 0;
-  padding-left: 18px;
-}
-
-.risk-notes li { margin: 6px 0; }
-
-/* ================= TOKEN ================= */
+/* ==================================================
+   TOKEN
+================================================== */
 
 .token-header {
   display: flex;
@@ -278,15 +267,19 @@ body[data-theme="light"] .input-wrapper input {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-weight: 700;
 }
 
-.token-header-main { flex: 1; display: flex; flex-direction: column; }
+.token-header-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
 .token-header-main h2 {
   margin: 0;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .token-address-row {
@@ -321,16 +314,14 @@ body[data-theme="light"] .input-wrapper input {
   color: #ffffff;
 }
 
+.copy-btn:active { background: rgba(0, 168, 255, 0.25); }
+
 .explorer-link {
   margin-top: 4px;
   font-size: 11px;
   color: var(--accent);
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
 }
-
-.explorer-link:hover { text-decoration: underline; }
 
 .token-fields { margin-top: 10px; }
 
@@ -339,16 +330,9 @@ body[data-theme="light"] .input-wrapper input {
   justify-content: space-between;
   padding: 5px 0;
   border-bottom: 1px dashed rgba(31, 41, 55, 0.6);
-  gap: 14px;
 }
 
 .field-label { color: var(--text-muted); }
-
-.status-msg {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
 
 /* ==================================================
    FOOTER
@@ -385,17 +369,6 @@ body[data-theme="light"] .input-wrapper input {
 }
 
 /* ==================================================
-   BACKGROUND CANVAS
-================================================== */
-
-#bg-squares {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* ==================================================
    MOBILE
 ================================================== */
 
@@ -403,4 +376,15 @@ body[data-theme="light"] .input-wrapper input {
   .header-main { flex-direction: column; align-items: flex-start; }
   .input-wrapper { flex-direction: column; }
   .input-wrapper button { width: 100%; }
+}
+
+/* ==================================================
+   BACKGROUND CANVAS
+================================================== */
+
+#bg-squares {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
 }
