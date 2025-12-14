@@ -1,7 +1,5 @@
-// Server-side only (Vercel / Node.js)
-
 const ARC_RPC = "https://testnet-rpc.arc.io"; 
-// ⬆️ troque pelo RPC oficial da ARC Testnet se for outro
+// ⚠️ use o RPC oficial correto da ARC Testnet
 
 async function rpc(method, params = []) {
   const res = await fetch(ARC_RPC, {
@@ -19,11 +17,10 @@ async function rpc(method, params = []) {
   return json.result;
 }
 
-async function callERC20(address, sig) {
+async function callERC20(address, selector) {
   try {
-    const data = sig;
     const result = await rpc("eth_call", [
-      { to: address, data },
+      { to: address, data: selector },
       "latest"
     ]);
     return result && result !== "0x";
@@ -39,35 +36,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid address" });
   }
 
-  // 1️⃣ Check bytecode
+  /* 1️⃣ Check if address has bytecode */
   const code = await rpc("eth_getCode", [address, "latest"]);
 
   if (!code || code === "0x") {
-    return res.json({
-      type: "wallet"
-    });
+    return res.json({ type: "wallet" });
   }
 
-  // 2️⃣ ERC-20 function selectors
-  const checks = {
-    name: "0x06fdde03",
-    symbol: "0x95d89b41",
-    decimals: "0x313ce567",
-    totalSupply: "0x18160ddd"
-  };
+  /* 2️⃣ Check ERC-20 interface */
+  const selectors = [
+    "0x06fdde03", // name()
+    "0x95d89b41", // symbol()
+    "0x313ce567", // decimals()
+    "0x18160ddd"  // totalSupply()
+  ];
 
-  let success = 0;
-
-  for (const sig of Object.values(checks)) {
-    const ok = await callERC20(address, sig);
-    if (ok) success++;
+  let hits = 0;
+  for (const sig of selectors) {
+    if (await callERC20(address, sig)) hits++;
   }
 
-  if (success >= 2) {
+  if (hits >= 2) {
     return res.json({
       type: "token",
       erc20: true,
-      confidence: success
+      confidence: hits
     });
   }
 
