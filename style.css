@@ -417,7 +417,7 @@ body[data-theme="light"] .input-wrapper input {
 /* ================= MOBILE LOGO POSITION FIX ================= */
 @media (max-width: 520px) {
   .header-logo {
-    margin-top: -50px; 
+    margin-top: -75px; 
   }
 }
 
