@@ -420,22 +420,10 @@ body[data-theme="light"] .input-wrapper input {
     margin-top: -50px; 
   }
 }
-/* ================= NETWORK + THEME ALIGN (MOBILE) ================= */
+
 @media (max-width: 520px) {
-  .network-row,
-  .network-select-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .network-row select {
-    flex: 1;
-  }
-
-  .theme-toggle,
-  .theme-btn {
-    margin-top: 0;
+  .subtitle {
+    margin-bottom: 28px;
   }
 }
 
