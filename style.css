@@ -414,4 +414,10 @@ body[data-theme="light"] .input-wrapper input {
   object-fit: cover;
   border-radius: 999px;
 }
+/* ================= MOBILE LOGO POSITION FIX ================= */
+@media (max-width: 520px) {
+  .header-logo {
+    margin-top: -10px; 
+  }
+}
 
